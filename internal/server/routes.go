@@ -14,6 +14,7 @@ func (s *Server) MountHandlers() {
 
     // Auth
     s.Router.Post("/auth/register", s.authHandler.RegisterHandler)
+    s.Router.Post("/auth/login", s.authHandler.LoginHandler)
 
 
     // s.Router.Get("/boards", GetBoards)

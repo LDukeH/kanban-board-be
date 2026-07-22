@@ -7,11 +7,15 @@ import (
 
 	"net/http"
 
+	"os"
+
+	"time"
+
 	"kanban-board-be/internal/server"
 
+	"kanban-board-be/internal/auth"
 	"kanban-board-be/internal/db"
 	"kanban-board-be/internal/user"
-	"kanban-board-be/internal/auth"
 )
 
 func main() {
@@ -31,7 +35,13 @@ func main() {
 	userHandler := user.NewHandler(userService)
 
 	// Auth injection
-	authService := auth.NewService(userService)
+
+	authConfig := auth.Config{
+		SecretKey:  os.Getenv("JWT_SECRET"),
+		Expiration: 24 * time.Hour,
+	}
+
+	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
 
 	// Create server

@@ -40,7 +40,7 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.authService.RegisterUser(user.Email, user.Password); err != nil {
-		log.Fatalf("Failed to register user: %v", err)
+		log.Printf("Failed to register user: %v", err)
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
@@ -51,5 +51,40 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "User registered successfully",
 	})
+}
 
+func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	// for now just decode the email and password from the request body and log them
+	var req LoginRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Println("ERROR decoding request body:", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+        return
+	}
+
+
+	if req.Email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Password == "" {
+		http.Error(w, "Password is required", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.authService.LoginUser(r.Context(), req.Email, req.Password)
+	if err != nil {
+		log.Printf("Failed to login user: %v", err)
+		http.Error(w, "Failed to login user", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK) // 200 OK
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"token": token,
+	})
 }

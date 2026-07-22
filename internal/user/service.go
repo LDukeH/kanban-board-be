@@ -33,5 +33,8 @@ func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {
 	}
 
 	return s.repo.GetByID(ctx, userID)
+}
 
+func (s *Service) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	return s.repo.GetByEmail(ctx, email)
 }
