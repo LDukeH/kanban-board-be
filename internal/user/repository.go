@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
 )
 
 type Repository struct {
@@ -27,7 +28,8 @@ func (r *Repository) CreateUser(ctx context.Context, user *User) error {
 	VALUES ($1, $2)
 	RETURNING id, created_at, updated_at`
 
-	return r.pool.QueryRow(ctx,query,user.Email,user.PasswordHash).Scan(&user.ID,&user.Email,&user.PasswordHash);
+
+	return r.pool.QueryRow(ctx,query,user.Email,user.PasswordHash).Scan(&user.ID,&user.CreatedAt,&user.UpdatedAt);
 }
 
 func (r *Repository) GetByID(
