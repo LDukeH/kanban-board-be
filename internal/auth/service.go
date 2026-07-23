@@ -8,8 +8,6 @@ import (
 	"context"
 
 	"github.com/golang-jwt/jwt/v5"
-	
-	
 
 	"time"
 
@@ -44,11 +42,11 @@ func (s *Service) RegisterUser(email, plainPassword string) (*user.User, error) 
 }
 
 func (s *Service) LoginUser(ctx context.Context ,email, plainPassword string) (string, error) {
-		user, err := s.userService.GetUserByEmail(ctx, email)
+	user, err := s.userService.GetUserByEmail(ctx, email)
 
-		if err !=nil{
-			return "", err
-		}
+	if err !=nil{
+		return "", err
+	}
 
 	// Compare the provided password with the stored hash
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(plainPassword)); err != nil {
@@ -89,4 +87,33 @@ func GenerateToken(userID string, secretKey string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString([]byte(secretKey))
+}
+
+func ValidateToken(tokenString string, secretKey string) (string, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(secretKey), nil
+	})
+
+	if(err!=nil){
+		log.Printf("Failed to parse token: %v", err)
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+
+	// check for validation errors
+	if(!ok || !token.Valid) {
+		log.Printf("Invalid token claims: %v", claims)
+		return "", jwt.ErrSignatureInvalid
+	}
+	
+	userID, ok := claims["user_id"].(string)
+	if !ok {
+		log.Printf("User ID not found in token claims: %v", claims)
+		return "", jwt.ErrSignatureInvalid
+	}
+	return userID, nil
 }

@@ -45,7 +45,7 @@ func main() {
 	authHandler := auth.NewHandler(authService)
 
 	// Create server
-	s := server.CreateNewServer(userHandler, authHandler)
+	s := server.CreateNewServer(userHandler, authHandler, authService)
 	s.MountHandlers()
 
 	// Start HTTP server

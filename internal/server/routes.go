@@ -17,8 +17,11 @@ func (s *Server) MountHandlers() {
     s.Router.Post("/auth/login", s.authHandler.LoginHandler)
 
 
-    // s.Router.Get("/boards", GetBoards)
-    // s.Router.Post("/boards", CreateBoard)
+    // Testing protected route with auth middleware
+    s.Router.With(s.authService.AuthMiddleware).Get("/protected", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("This is a protected route"))
+    })
 }
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
