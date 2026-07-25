@@ -81,10 +81,45 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK) // 200 OK
+	http.SetCookie(w, &http.Cookie{
+    Name:     "access_token",
+    Value:    token, // Your JWT string
+    Path:     "/",
+    HttpOnly: true,
+    Secure:   false,               // Set to true in production (HTTPS)
+    SameSite: http.SameSiteLaxMode,
+})
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"token": token,
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	// Clear the cookie by setting its MaxAge to -1
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production (HTTPS)
+		MaxAge:   -1,
+		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	// Get user from database
+	user, err := h.authService.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		log.Printf("Failed to get user by ID: %v", err)
+		http.Error(w, "Failed to get user", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
+
 }
