@@ -27,7 +27,7 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetUserByID(r.Context(), id)
 	if err != nil {
 		log.Printf("ERROR fetching user: %v\n", err)
-		http.Error(w, "Failed to fetch user", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

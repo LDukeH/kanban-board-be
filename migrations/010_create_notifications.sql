@@ -1,5 +1,5 @@
 CREATE TABLE notifications (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     -- the one who receives the notification
     user_id UUID NOT NULL,

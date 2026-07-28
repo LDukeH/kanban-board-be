@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"net/http"
@@ -19,17 +20,39 @@ import (
         }))
         s.Router.Get("/",helloHandler)
 
-        s.Router.Get("/users/{id}", s.userHandler.GetUserByID)
+        s.Router.Route("/auth", func(r chi.Router) {
+        r.Post("/register", s.authHandler.RegisterHandler)
+        r.Post("/login", s.authHandler.LoginHandler)
 
-        // Auth
-        s.Router.Post("/auth/register", s.authHandler.RegisterHandler)
-        s.Router.Post("/auth/login", s.authHandler.LoginHandler)
-        s.Router.Post("/auth/logout", s.authHandler.LogoutHandler)
+        // Protected auth routes
+        r.Group(func(r chi.Router) {
+            r.Use(s.authService.AuthMiddleware)
 
+            r.Post("/logout", s.authHandler.LogoutHandler)
+            r.Get("/me", s.authHandler.GetMeHandler)
+        })
 
-        // Testing protected route with auth middleware
-        s.Router.With(s.authService.AuthMiddleware).Get("/auth/me", s.authHandler.GetMeHandler)
-    }
+         // Protected API
+        s.Router.Group(func(r chi.Router) {
+        r.Use(s.authService.AuthMiddleware)
+
+        r.Get("/users/{id}", s.userHandler.GetUserByID)
+
+        // Workspace routes
+        r.Route("/workspaces", func(r chi.Router) {
+            r.Post("/", s.workspaceHandler.CreateWorkspace)
+            r.Get("/{id}", s.workspaceHandler.GetWorkspaceByID)
+            r.Get("/", s.workspaceHandler.GetAllWorkspaces)
+
+            // Board routes
+            r.Route("/{workspaceID}/boards", func(r chi.Router) {
+                r.Post("/", s.boardHandler.CreateBoard)
+        })
+
+    })
+    })
+    })
+}
 
     func helloHandler(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusOK)

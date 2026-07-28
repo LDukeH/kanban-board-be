@@ -10,6 +10,8 @@ import (
 	"log"
 )
 
+// handler struct
+
 type Handler struct {
 	authService *Service
 }
@@ -21,27 +23,31 @@ func NewHandler(authService *Service) *Handler {
 }
 
 func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	var user user.User
+	var req RegisterRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Println("ERROR decoding request body:", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if user.Email ==""{
+	if req.Email == "" {
 		http.Error(w, "Email is required", http.StatusBadRequest)
 		return
 	}
 
-	if(user.Password==""){
+	if(req	.Password==""){
 		http.Error(w, "Password is required", http.StatusBadRequest)
 		return
 	}
 
+	var user user.User
+	user.Email = req.Email
+	user.Password = req.Password
+
 	if _, err := h.authService.RegisterUser(user.Email, user.Password); err != nil {
 		log.Printf("Failed to register user: %v", err)
-		http.Error(w, "Failed to register user", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -77,7 +83,7 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	token, err := h.authService.LoginUser(r.Context(), req.Email, req.Password)
 	if err != nil {
 		log.Printf("Failed to login user: %v", err)
-		http.Error(w, "Failed to login user", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -107,7 +113,7 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(userIDKey).(string)
+	userID, ok := r.Context().Value(UserIDKey).(string)
 	if !ok || userID == "" {
 		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
 		return
@@ -117,9 +123,14 @@ func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.authService.userService.GetUserByID(r.Context(), userID)
 	if err != nil {
 		log.Printf("Failed to get user by ID: %v", err)
-		http.Error(w, "Failed to get user", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(user)
 
+	getMeResponse := GetMeResponse{
+		ID:    user.ID.String(),
+		Email: user.Email,
+	}
+
+	json.NewEncoder(w).Encode(getMeResponse)
 }

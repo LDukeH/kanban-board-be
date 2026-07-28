@@ -1,5 +1,5 @@
 CREATE TABLE workspace_memberships (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     workspace_id UUID NOT NULL,
     role TEXT NOT NULL,

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"context"
+
 )
 
 func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
@@ -32,7 +33,7 @@ func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Attach the user ID to the request context, userIDKey is from model
-		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		ctx := context.WithValue(r.Context(), UserIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

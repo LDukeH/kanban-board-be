@@ -14,8 +14,11 @@ import (
 	"kanban-board-be/internal/server"
 
 	"kanban-board-be/internal/db"
-	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/board"
+	"kanban-board-be/internal/feature/membership"
+	"kanban-board-be/internal/feature/user"
+	"kanban-board-be/internal/feature/workspace"
 )
 
 func main() {
@@ -44,8 +47,19 @@ func main() {
 	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
 
+	// Workspace injection
+	workspaceRepo := workspace.NewRepository(pool)
+	membershipRepo := membership.NewRepository(pool)
+	workspaceService := workspace.NewService(workspaceRepo, membershipRepo)
+	workspaceHandler := workspace.NewHandler(workspaceService)
+
+	// Board injection
+	boardRepo := board.NewRepository(pool)
+	boardService := board.NewService(boardRepo, workspaceRepo)
+	boardHandler := board.NewHandler(boardService)
+
 	// Create server
-	s := server.CreateNewServer(userHandler, authHandler, authService)
+	s := server.CreateNewServer(userHandler, authHandler, authService, workspaceHandler, workspaceService, boardHandler, boardService)
 	s.MountHandlers()
 
 	// Start HTTP server

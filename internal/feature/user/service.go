@@ -22,7 +22,7 @@ func NewService(repo *Repository) *Service {
 }
 
 func (s *Service) CreateUser(ctx context.Context, user *User) error {
-	return s.repo.CreateUser(ctx, user)
+	return s.repo.Create(ctx, user)
 }
 
 func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {

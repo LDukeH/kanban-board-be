@@ -1,5 +1,5 @@
 CREATE TABLE tasks (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     column_id UUID NOT NULL,
     title TEXT NOT NULL,
     description TEXT,

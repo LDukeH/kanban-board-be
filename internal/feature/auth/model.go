@@ -12,6 +12,17 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+type RegisterRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type GetMeResponse struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+}
+
+
 type contextKey string
 
-const userIDKey contextKey = "user_id"
+const UserIDKey contextKey = "user_id"

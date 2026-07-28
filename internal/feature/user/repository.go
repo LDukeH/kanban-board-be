@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"fmt"
 )
 
 type Repository struct {
@@ -18,7 +20,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-func (r *Repository) CreateUser(ctx context.Context, user *User) error {
+func (r *Repository) Create(ctx context.Context, user *User) error {
 	query:= 
 	`INSERT INTO users (
 			email,
@@ -62,7 +64,7 @@ func (r *Repository) GetByID(
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get user by ID: %w", err)
 	}
 
 	return user, nil
@@ -98,7 +100,7 @@ query := `
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
 	return user, nil
