@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"kanban-board-be/internal/user"
+	"kanban-board-be/internal/feature/user"
 
 	"encoding/json"
 

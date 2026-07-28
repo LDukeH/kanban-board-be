@@ -69,3 +69,5 @@ Desktop.ini
 *.tmp
 *.temp
 *.bak
+
+/docs

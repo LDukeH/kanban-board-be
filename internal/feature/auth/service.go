@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"kanban-board-be/internal/user"
+	"kanban-board-be/internal/feature/user"
 
 	"golang.org/x/crypto/bcrypt"
 

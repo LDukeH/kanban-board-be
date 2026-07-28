@@ -13,9 +13,9 @@ import (
 
 	"kanban-board-be/internal/server"
 
-	"kanban-board-be/internal/auth"
 	"kanban-board-be/internal/db"
-	"kanban-board-be/internal/user"
+	"kanban-board-be/internal/feature/user"
+	"kanban-board-be/internal/feature/auth"
 )
 
 func main() {

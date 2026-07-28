@@ -3,8 +3,8 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 
-	"kanban-board-be/internal/auth"
-	"kanban-board-be/internal/user"
+	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/user"
 )
 
 type Server struct{
