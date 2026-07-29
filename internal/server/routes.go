@@ -32,7 +32,7 @@ import (
             r.Get("/me", s.authHandler.GetMeHandler)
         })
 
-         // Protected API
+        // Protected API
         s.Router.Group(func(r chi.Router) {
         r.Use(s.authService.AuthMiddleware)
 
@@ -44,12 +44,25 @@ import (
             r.Get("/{id}", s.workspaceHandler.GetWorkspaceByID)
             r.Get("/", s.workspaceHandler.GetAllWorkspaces)
 
-            // Board routes
+            // Board routes inside workspace
             r.Route("/{workspaceID}/boards", func(r chi.Router) {
                 r.Post("/", s.boardHandler.CreateBoard)
+                r.Get("/", s.boardHandler.GetBoardsByWorkspaceID)
         })
-
     })
+        // Other protected routes can be added here
+        // Board routes
+        r.Route("/boards", func(r chi.Router) {
+            r.Get("/{boardID}", s.boardHandler.GetBoardByID)
+            // r.Put("/{id}", s.boardHandler.UpdateBoard)
+            // r.Delete("/{id}", s.boardHandler.DeleteBoard)
+
+            // Column routes inside board
+            r.Route("/{boardID}/columns", func(r chi.Router) {
+                r.Post("/", s.columnHandler.CreateColumn)
+                r.Get("/", s.columnHandler.GetColumnsByBoardID)
+            })
+        })
     })
     })
 }

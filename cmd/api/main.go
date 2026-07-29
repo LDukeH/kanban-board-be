@@ -15,7 +15,9 @@ import (
 
 	"kanban-board-be/internal/db"
 	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/board"
+	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
@@ -55,11 +57,21 @@ func main() {
 
 	// Board injection
 	boardRepo := board.NewRepository(pool)
-	boardService := board.NewService(boardRepo, workspaceRepo)
+
+	// Column injection
+	columnRepo := column.NewRepository(pool)
+
+	// Authorization injection
+	authzService := authz.NewService(workspaceRepo, boardRepo, columnRepo)
+
+	boardService := board.NewService(boardRepo, authzService)
 	boardHandler := board.NewHandler(boardService)
 
+	columnService := column.NewService(boardRepo, columnRepo, authzService)
+	columnHandler := column.NewHandler(columnService)
+
 	// Create server
-	s := server.CreateNewServer(userHandler, authHandler, authService, workspaceHandler, workspaceService, boardHandler, boardService)
+	s := server.CreateNewServer(userHandler, authHandler, authService, workspaceHandler, workspaceService, boardHandler, boardService, columnHandler, columnService)
 	s.MountHandlers()
 
 	// Start HTTP server

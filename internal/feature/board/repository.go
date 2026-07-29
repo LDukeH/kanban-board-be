@@ -69,3 +69,44 @@ func (r *Repository) GetByWorkspaceID(ctx context.Context, workspaceID uuid.UUID
 
 	return boards, nil
 }
+
+// GetBoardWorkspaceID returns the workspace ID for a given board.
+// This satisfies the authz.BoardWorkspaceProvider interface.
+func (r *Repository) GetBoardWorkspaceID(ctx context.Context, boardID uuid.UUID) (uuid.UUID, error) {
+	query := `SELECT workspace_id FROM boards WHERE id = $1`
+
+	var workspaceID uuid.UUID
+	err := r.pool.QueryRow(ctx, query, boardID).Scan(&workspaceID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to get board workspace ID: %w", err)
+	}
+
+	return workspaceID, nil
+}
+
+func (r *Repository) GetByID(ctx context.Context, boardID uuid.UUID) (*Board, error) {
+	query := 
+	`SELECT 
+		id,
+		name,
+		workspace_id,
+		created_at,
+		updated_at
+	FROM boards
+	WHERE id = $1`
+
+	row := r.pool.QueryRow(ctx, query, boardID)
+	board := &Board{}
+	err := row.Scan(
+		&board.ID,
+		&board.Name,
+		&board.WorkspaceID,
+		&board.CreatedAt,
+		&board.UpdatedAt,
+	)
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan board: %w", err)
+	}
+	return board, nil
+}

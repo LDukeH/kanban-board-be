@@ -14,3 +14,7 @@ type Column struct {
     CreatedAt time.Time `json:"created_at"`
     UpdatedAt time.Time `json:"updated_at"`
 }
+
+type ColumnCreateRequest struct {
+    Name     string `json:"name"`
+}

@@ -4,9 +4,10 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/board"
+	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
-	"kanban-board-be/internal/feature/board"
 )
 
 type Server struct{
@@ -26,6 +27,10 @@ type Server struct{
 	// boardHandler *board.Handler
 	boardHandler *board.Handler
 	boardService *board.Service
+
+	// columnHandler *column.Handler
+	columnHandler *column.Handler
+	columnService *column.Service
 }
 
 func CreateNewServer(
@@ -36,6 +41,8 @@ func CreateNewServer(
 	workspaceService *workspace.Service,
 	boardHandler *board.Handler,
 	boardService *board.Service,
+	columnHandler *column.Handler,
+	columnService *column.Service,
 ) *Server{
 	s := &Server{
 		userHandler: userHandler,
@@ -45,6 +52,8 @@ func CreateNewServer(
 		workspaceService: workspaceService,
 		boardHandler: boardHandler,
 		boardService: boardService,
+		columnHandler: columnHandler,
+		columnService: columnService,
 	}
 	s.Router = chi.NewRouter()
 	return s
