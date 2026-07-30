@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"context"
-
 )
 
 func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
@@ -17,8 +16,16 @@ func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			if err == http.ErrNoCookie {
 				http.Error(w, "Missing access token", http.StatusUnauthorized)
-				return
+			} else{
+				 log.Printf("failed to read access token cookie: %v", err)
+				http.Error(w,"Invalid request", http.StatusBadRequest)
 			}
+			return
+		}
+
+		if cookie == nil || cookie.Value == "" {
+			http.Error(w, "Missing access token", http.StatusUnauthorized)
+			return
 		}
 
 		tokenString := cookie.Value

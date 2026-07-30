@@ -2,9 +2,11 @@ package column
 
 import (
 	"encoding/json"
-	"kanban-board-be/internal/feature/auth"
 	"log"
 	"net/http"
+
+	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -58,7 +60,7 @@ func (h *Handler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.CreateColumn(r.Context(), userID, &column); err != nil {
 		log.Printf("ERROR: Failed to create column: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -86,7 +88,7 @@ func (h *Handler) GetColumnsByBoardID(w http.ResponseWriter, r *http.Request) {
 	columns, err := h.service.GetColumnsByBoardID(r.Context(), boardID, userID)
 	if err != nil {
 		log.Printf("ERROR: Failed to get columns: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 

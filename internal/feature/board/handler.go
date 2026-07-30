@@ -2,9 +2,11 @@ package board
 
 import (
 	"encoding/json"
-	"kanban-board-be/internal/feature/auth"
 	"log"
 	"net/http"
+
+	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -56,7 +58,7 @@ func (h *Handler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.CreateBoard(r.Context(), userID, &board); err != nil {
 		log.Printf("ERROR: Failed to create board: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -84,7 +86,7 @@ func (h *Handler) GetBoardsByWorkspaceID(w http.ResponseWriter, r *http.Request)
 	boards, err := h.service.GetBoardsByWorkspaceID(r.Context(), workspaceID, userID)
 	if err != nil {
 		log.Printf("ERROR: Failed to get boards: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -111,10 +113,82 @@ func (h *Handler) GetBoardByID(w http.ResponseWriter, r *http.Request) {
 	board, err := h.service.GetBoardByID(r.Context(), boardID, userID)
 	if err != nil {
 		log.Printf("ERROR: Failed to get board: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(board)
 }
+
+func (h *Handler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
+	var req BoardUpdateRequest
+
+	userID, err := auth.GetUserID(r)
+	
+	boardIDStr := chi.URLParam(r, "id")
+	boardID, err := uuid.Parse(boardIDStr)
+
+	if err != nil {
+		log.Println("ERROR: Invalid board ID")
+		http.Error(w, "Invalid board ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("ERROR decoding request body: %v\n", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "Board name is required", http.StatusBadRequest)
+		return
+	}
+
+	board := Board{
+		Name: req.Name,
+		ID:   boardID,
+	}
+
+	if err := h.service.UpdateBoard(r.Context(), userID, &board); err != nil {
+		log.Printf("ERROR: Failed to update board: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(board)
+}
+
+func (h *Handler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
+	// Get board ID from URL
+	boardIDStr := chi.URLParam(r, "boardID")
+
+	boardID, err := uuid.Parse(boardIDStr)
+	if err != nil {
+		http.Error(w, "Invalid board ID", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		log.Println("ERROR: userID not found in context")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.service.DeleteBoard(r.Context(), boardID, userID); err != nil {
+		log.Printf("ERROR: Failed to delete board: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Board deleted successfully",
+	})
+}
+

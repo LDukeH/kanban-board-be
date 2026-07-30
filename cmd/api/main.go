@@ -52,8 +52,7 @@ func main() {
 	// Workspace injection
 	workspaceRepo := workspace.NewRepository(pool)
 	membershipRepo := membership.NewRepository(pool)
-	workspaceService := workspace.NewService(workspaceRepo, membershipRepo)
-	workspaceHandler := workspace.NewHandler(workspaceService)
+	
 
 	// Board injection
 	boardRepo := board.NewRepository(pool)
@@ -69,6 +68,9 @@ func main() {
 
 	columnService := column.NewService(boardRepo, columnRepo, authzService)
 	columnHandler := column.NewHandler(columnService)
+
+	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)
+	workspaceHandler := workspace.NewHandler(workspaceService)
 
 	// Create server
 	s := server.CreateNewServer(userHandler, authHandler, authService, workspaceHandler, workspaceService, boardHandler, boardService, columnHandler, columnService)

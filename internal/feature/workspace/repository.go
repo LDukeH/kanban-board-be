@@ -2,9 +2,11 @@ package workspace
 
 import (
 	"context"
+	"log"
 
 	"github.com/google/uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"fmt"
@@ -23,6 +25,10 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
+func (r *Repository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+    return r.pool.Begin(ctx)
+}
+
 func (r *Repository) Create(ctx context.Context, workspace *Workspace) error {
 	query:=
 	`INSERT INTO workspaces (
@@ -32,6 +38,30 @@ func (r *Repository) Create(ctx context.Context, workspace *Workspace) error {
 	RETURNING id, created_at, updated_at`
 
 	return r.pool.QueryRow(ctx, query, workspace.Name).Scan(&workspace.ID, &workspace.CreatedAt, &workspace.UpdatedAt)
+}
+
+func (r *Repository) CreateTx(
+    ctx context.Context,
+    tx pgx.Tx,
+    workspace *Workspace,
+) error {
+   query := `
+		INSERT INTO workspaces (
+			name
+		)
+		VALUES ($1)
+		RETURNING id, created_at, updated_at
+	`
+
+	return tx.QueryRow(
+		ctx,
+		query,
+		workspace.Name,
+	).Scan(
+		&workspace.ID,
+		&workspace.CreatedAt,
+		&workspace.UpdatedAt,
+	)
 }
 
 func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error) {
@@ -70,6 +100,10 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*Work
 		}
 		workspaces = append(workspaces, workspace)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over workspace rows: %w", err)
+	}
+
 
 	return workspaces, nil
 }
@@ -134,6 +168,9 @@ func (r *Repository) GetList(ctx context.Context) ([]*Workspace, error) {
 		}
 		workspaces = append(workspaces, workspace)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over workspace rows: %w", err)
+	}
 
 	return workspaces, nil
 }
@@ -143,6 +180,7 @@ func (r *Repository) GetMembership(
 	userID, workspaceID uuid.UUID,
 ) (*membership.WorkspaceMembership, error) {
 
+	log.Default().Println("GetMembership called with userID:", userID, "workspaceID:", workspaceID)
 	query := `
 		SELECT
 			user_id,
@@ -150,7 +188,7 @@ func (r *Repository) GetMembership(
 			role
 		FROM workspace_memberships
 		WHERE user_id = $1
-		  AND workspace_id = $2
+		AND workspace_id = $2
 	`
 
 	membership := &membership.WorkspaceMembership{}
@@ -171,4 +209,32 @@ func (r *Repository) GetMembership(
 	}
 
 	return membership, nil
+}
+
+func (r *Repository) UpdateWorkspace(ctx context.Context, workspace *Workspace) error {
+	query := `
+		UPDATE workspaces
+		SET name = $1,
+			updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := r.pool.Exec(ctx, query, workspace.Name, workspace.ID)
+	if err != nil {
+		return fmt.Errorf("failed to update workspace: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) DeleteWorkspace(ctx context.Context, workspaceID uuid.UUID) error {
+	query := `
+		DELETE FROM workspaces
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete workspace: %w", err)
+	}
+	return nil
 }

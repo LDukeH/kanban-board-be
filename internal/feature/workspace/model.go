@@ -28,3 +28,7 @@ type WorkspaceSummary struct {
 type WorkspaceCreateRequest struct {
 	Name string `json:"name"`
 }
+
+type WorkspaceUpdateRequest struct {
+	Name string `json:"name"`
+}

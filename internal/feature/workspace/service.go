@@ -2,45 +2,69 @@ package workspace
 
 import (
 	"context"
+	"log"
 
+	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/membership"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"fmt"
-
 )
 
-type Service struct {
-	workspaceRepo  *Repository
-	membershipRepo *membership.Repository
+type workspaceRepository interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
+	Create(ctx context.Context, workspace *Workspace) error
+	CreateTx(ctx context.Context, tx pgx.Tx, workspace *Workspace) error
+	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Workspace, error)
+	UpdateWorkspace(ctx context.Context, workspace *Workspace) error
+	DeleteWorkspace(ctx context.Context, workspaceID uuid.UUID) error
 }
 
-func NewService(workspaceRepo *Repository, membershipRepo *membership.Repository) *Service {
+type membershipRepository interface {
+	CreateTx(ctx context.Context, tx pgx.Tx, membership *membership.WorkspaceMembership) error
+}
+
+type Service struct {
+	workspaceRepo  workspaceRepository
+	membershipRepo membershipRepository
+	authz          *authz.Service
+}
+
+func NewService(workspaceRepo workspaceRepository, membershipRepo membershipRepository, authz *authz.Service) *Service {
 	return &Service{
 		workspaceRepo:  workspaceRepo,
 		membershipRepo: membershipRepo,
+		authz:          authz,
 	}
 }
 
 func (s *Service) CreateWorkspace(ctx context.Context, workspace *Workspace, userID uuid.UUID) error {
-	// Create the workspace
-	if err := s.workspaceRepo.Create(ctx, workspace); err != nil {
-		return err
+	tx, err := s.workspaceRepo.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	// Create the workspace membership for the user
+	defer tx.Rollback(ctx) // Rollback the transaction if not committed
+
+	// Create the workspace
+	if err := s.workspaceRepo.CreateTx(ctx, tx, workspace); err != nil {
+		return fmt.Errorf("failed to create workspace: %w", err)
+	}
+
 	membership := &membership.WorkspaceMembership{
 		WorkspaceID: workspace.ID,
 		UserID:      userID,
-		Role:        membership.Owner, // Assign the owner role to the user creating the workspace
+		Role:        membership.Owner,
 	}
 
-	// TODO:
-	// Wrap workspace creation + owner membership creation
-	// in a single database transaction. So that if one fails, the other won't be created either.
+	if err := s.membershipRepo.CreateTx(ctx, tx, membership); err != nil {
+		return fmt.Errorf("failed to create workspace membership: %w", err)
+	}
 
-	return s.membershipRepo.Create(ctx, membership)
+	return tx.Commit(ctx)
 }
 
 // by user id, get all workspaces that the user is a member of
@@ -52,11 +76,60 @@ func (s *Service) GetAllWorkspaces(ctx context.Context, userID uuid.UUID) ([]*Wo
 	return workspaces, nil
 }
 
-func (s *Service) GetWorkspaceByID(ctx context.Context, id string) (*Workspace, error) {
+func (s *Service) GetWorkspaceByID(ctx context.Context, id string, userID uuid.UUID) (*Workspace, error) {
 	workspaceID, err := uuid.Parse(id)
+
 	if err != nil {
 		return nil, fmt.Errorf("invalid workspace ID format: %w", err)
 	}
+	// Check if the workspace exists
+	workspace, err := s.workspaceRepo.GetByID(ctx, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workspace by ID: %w", err)
+	}
 
-	return s.workspaceRepo.GetByID(ctx, workspaceID)
+	// Check that the user is a member of the workspace.
+	if _, err := s.authz.GetWorkspaceRole(ctx, userID, workspaceID); err != nil {
+		return nil, fmt.Errorf("user is not authorized to access this workspace: %w", err)
+	}
+
+	return workspace, nil
+}
+
+func (s *Service) UpdateWorkspace(ctx context.Context,workspace Workspace, userID uuid.UUID) error {
+	// Check that the user is a owner of the workspace.
+	role, err := s.authz.GetWorkspaceRole(ctx, userID, workspace.ID)
+
+	log.Default().Println("User role:", role)
+	if err != nil {
+		return fmt.Errorf("failed to get workspace role: %w", err)
+	}
+	if role != membership.Owner {
+		return fmt.Errorf("user is not authorized to update this workspace")
+	}
+
+	// Update the workspace
+	if err := s.workspaceRepo.UpdateWorkspace(ctx, &workspace); err != nil {
+		return fmt.Errorf("failed to update workspace: %w", err)
+	}
+
+	return nil	
+}
+
+func (s *Service) DeleteWorkspace(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) error {
+	// Check that the user is a owner of the workspace.
+	role, err := s.authz.GetWorkspaceRole(ctx, userID, workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get workspace role: %w", err)
+	}
+	if role != membership.Owner {
+		return fmt.Errorf("user is not authorized to delete this workspace")
+	}
+
+	// Delete the workspace
+	if err := s.workspaceRepo.DeleteWorkspace(ctx, workspaceID); err != nil {
+		return fmt.Errorf("failed to delete workspace: %w", err)
+	}
+
+	return nil
 }

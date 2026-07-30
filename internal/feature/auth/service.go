@@ -1,17 +1,18 @@
 package auth
 
 import (
-	"kanban-board-be/internal/feature/user"
-
-	"golang.org/x/crypto/bcrypt"
-
 	"context"
-
-	"github.com/golang-jwt/jwt/v5"
-
+	"errors"
+	"log"
 	"time"
 
-	"log"
+	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/user"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Service struct {
@@ -26,9 +27,8 @@ func NewService(userService *user.Service, config Config) *Service {
 	}
 }
 
-func (s *Service) RegisterUser(email, plainPassword string) (*user.User, error) {
+func (s *Service) RegisterUser(ctx context.Context, email, plainPassword string) (*user.User, error) {
 	hash, err := HashPassword(plainPassword)
-	
 	if err != nil {
 		return nil, err
 	}
@@ -37,26 +37,40 @@ func (s *Service) RegisterUser(email, plainPassword string) (*user.User, error) 
 		Email:        email,
 		PasswordHash: hash,
 	}
-	
-	return newUser, s.userService.CreateUser(context.Background(), newUser)
+
+	if err := s.userService.CreateUser(ctx, newUser); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, errors.Join(apperrors.ErrConflict, err)
+		}
+		return nil, err
+	}
+
+	return newUser, nil
 }
 
-func (s *Service) LoginUser(ctx context.Context ,email, plainPassword string) (string, error) {
-	user, err := s.userService.GetUserByEmail(ctx, email)
+func (s *Service) LookupUser(ctx context.Context) (*user.User, error) {
+	userID, err := GetUserIDCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	if err !=nil{
+	return s.userService.GetUserByID(ctx, userID.String())
+}
+
+func (s *Service) LoginUser(ctx context.Context, email, plainPassword string) (string, error) {
+	user, err := s.userService.GetUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", errors.Join(apperrors.ErrNotFound, err)
+		}
 		return "", err
 	}
 
 	// Compare the provided password with the stored hash
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(plainPassword)); err != nil {
 		log.Printf("Password mismatch for user %s: %v", email, err)
-		return "", err // Passwords do not match
-	}
-
-	if err != nil {
-		log.Printf("Invalid credentials for user %s: %v", email, err)
-		return "",err
+		return "", errors.Join(apperrors.ErrInvalidCredential, err)
 	}
 
 	token, err := GenerateToken(user.ID.String(), s.config.SecretKey)
@@ -64,7 +78,7 @@ func (s *Service) LoginUser(ctx context.Context ,email, plainPassword string) (s
 		log.Printf("Failed to generate token for user %s: %v", email, err)
 		return "", err
 	}
-	
+
 	return token, nil
 }
 
@@ -98,23 +112,22 @@ func ValidateToken(tokenString string, secretKey string) (string, error) {
 		return []byte(secretKey), nil
 	})
 
-	if(err!=nil){
+	if err != nil {
 		log.Printf("Failed to parse token: %v", err)
-		return "", err
+		return "", errors.Join(apperrors.ErrUnauthorized, err)
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 
-	// check for validation errors
-	if(!ok || !token.Valid) {
+	if !ok || !token.Valid {
 		log.Printf("Invalid token claims: %v", claims)
-		return "", jwt.ErrSignatureInvalid
+		return "", errors.Join(apperrors.ErrUnauthorized, jwt.ErrSignatureInvalid)
 	}
-	
+
 	userID, ok := claims["user_id"].(string)
 	if !ok {
 		log.Printf("User ID not found in token claims: %v", claims)
-		return "", jwt.ErrSignatureInvalid
+		return "", errors.Join(apperrors.ErrUnauthorized, jwt.ErrSignatureInvalid)
 	}
 	return userID, nil
 }

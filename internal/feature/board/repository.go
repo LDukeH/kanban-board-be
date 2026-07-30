@@ -66,6 +66,9 @@ func (r *Repository) GetByWorkspaceID(ctx context.Context, workspaceID uuid.UUID
 		}
 		boards = append(boards, board)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over board rows: %w", err)
+	}
 
 	return boards, nil
 }
@@ -109,4 +112,31 @@ func (r *Repository) GetByID(ctx context.Context, boardID uuid.UUID) (*Board, er
 		return nil, fmt.Errorf("failed to scan board: %w", err)
 	}
 	return board, nil
+}
+
+func (r *Repository) UpdateBoard(ctx context.Context, board *Board) error {
+	query := `
+		UPDATE boards
+		SET name = $1, updated_at = NOW()	
+	WHERE id = $2
+	RETURNING updated_at
+	`
+	err := r.pool.QueryRow(ctx, query, board.Name, board.ID).Scan(&board.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to update board: %w", err)
+	}
+	return nil;
+}
+
+func (r *Repository) DeleteBoard(ctx context.Context, boardID uuid.UUID) error {
+	query := `
+		DELETE FROM boards
+	WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, boardID)
+	if err != nil {
+		return fmt.Errorf("failed to delete board: %w", err)
+	}
+
+	return nil;
 }

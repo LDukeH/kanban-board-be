@@ -10,12 +10,18 @@ import (
 	"github.com/google/uuid"
 )
 
+type userRepository interface {
+	Create(ctx context.Context, user *User) error
+	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
+	GetByEmail(ctx context.Context, email string) (*User, error)
+}
+
 type Service struct {
-	repo *Repository
+	repo userRepository
 }
 
 
-func NewService(repo *Repository) *Service {
+func NewService(repo userRepository) *Service {
 	return &Service{
 		repo: repo,
 	}

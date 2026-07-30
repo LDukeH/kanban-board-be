@@ -1,11 +1,11 @@
 package user
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 
-	"encoding/json"
-
-	"log"
+	"kanban-board-be/internal/apperrors"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -27,9 +27,14 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetUserByID(r.Context(), id)
 	if err != nil {
 		log.Printf("ERROR fetching user: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
-	json.NewEncoder(w).Encode(user)
+	res := UserResponse{
+		ID:    user.ID,
+		Email: user.Email,
+	}
+
+	json.NewEncoder(w).Encode(res)
 }

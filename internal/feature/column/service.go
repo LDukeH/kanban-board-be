@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/membership"
@@ -11,13 +12,23 @@ import (
 	"github.com/google/uuid"
 )
 
+type columnRepository interface {
+	Create(ctx context.Context, column *Column) error
+	GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error)
+	GetByID(ctx context.Context, columnID string) (*Column, error)
+}
+
+type boardRepository interface {
+	GetByID(ctx context.Context, boardID uuid.UUID) (*board.Board, error)
+}
+
 type Service struct {
-	boardRepo  *board.Repository
-	columnRepo *Repository
+	boardRepo  boardRepository
+	columnRepo columnRepository
 	authz      *authz.Service
 }
 
-func NewService(boardRepo *board.Repository, columnRepo *Repository, authz *authz.Service) *Service {
+func NewService(boardRepo boardRepository, columnRepo columnRepository, authz *authz.Service) *Service {
 	return &Service{
 		boardRepo:  boardRepo,
 		columnRepo: columnRepo,
@@ -26,22 +37,14 @@ func NewService(boardRepo *board.Repository, columnRepo *Repository, authz *auth
 }
 
 func (s *Service) CreateColumn(ctx context.Context, userID uuid.UUID, column *Column) error {
-	if err := s.authz.RequireBoardRole(
-		ctx,
-		userID,
-		column.BoardID,
-		membership.Owner,
-		membership.Admin,
-	); err != nil {
+	role, err := s.authz.GetBoardRole(ctx, userID, column.BoardID)
+	if err != nil {
 		return err
 	}
-
-	// Auto-assign the next position
-	columns, err := s.columnRepo.GetByBoardID(ctx, column.BoardID)
-	if err != nil {
-		return fmt.Errorf("get columns for position: %w", err)
+	if role != membership.Owner && role != membership.Admin {
+		return apperrors.ErrForbidden
 	}
-	column.Position = len(columns)
+	// position will be handled in repository layer, so we don't need to set it here
 
 	return s.columnRepo.Create(ctx, column)
 }
@@ -57,14 +60,7 @@ func (s *Service) GetColumnsByBoardID(ctx context.Context, boardID uuid.UUID, us
 		return nil, fmt.Errorf("board not found: %w", err)
 	}
 
-	if err := s.authz.RequireBoardRole(
-		ctx,
-		userID,
-		boardID,
-		membership.Owner,
-		membership.Admin,
-		membership.Member,
-	); err != nil {
+	if _, err := s.authz.GetBoardRole(ctx, userID, boardID); err != nil {
 		return nil, err
 	}
 

@@ -25,3 +25,7 @@ type BoardSummary struct {
 type BoardCreateRequest struct {
     Name string `json:"name"`
 }
+
+type BoardUpdateRequest struct {
+    Name string `json:"name"`
+}

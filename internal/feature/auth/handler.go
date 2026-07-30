@@ -1,13 +1,12 @@
 package auth
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 
+	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/user"
-
-	"encoding/json"
-
-	"log"
 )
 
 // handler struct
@@ -45,9 +44,9 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	user.Email = req.Email
 	user.Password = req.Password
 
-	if _, err := h.authService.RegisterUser(user.Email, user.Password); err != nil {
+	if _, err := h.authService.RegisterUser(r.Context(), user.Email, user.Password); err != nil {
 		log.Printf("Failed to register user: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -83,7 +82,7 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	token, err := h.authService.LoginUser(r.Context(), req.Email, req.Password)
 	if err != nil {
 		log.Printf("Failed to login user: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -113,17 +112,10 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(UserIDKey).(string)
-	if !ok || userID == "" {
-		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-
-	// Get user from database
-	user, err := h.authService.userService.GetUserByID(r.Context(), userID)
+	user, err := h.authService.LookupUser(r.Context())
 	if err != nil {
-		log.Printf("Failed to get user by ID: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Failed to get user: %v", err)
+		apperrors.WriteError(w, err)
 		return
 	}
 

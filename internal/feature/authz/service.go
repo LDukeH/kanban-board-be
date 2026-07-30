@@ -45,61 +45,44 @@ func NewService(
 	}
 }
 
-// RequireWorkspaceRole checks that the user has one of the allowed roles in the workspace.
-func (s *Service) RequireWorkspaceRole(
+// GetWorkspaceRole returns the user's role in the workspace.
+func (s *Service) GetWorkspaceRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	workspaceID uuid.UUID,
-	allowedRoles ...membership.WorkspaceRole,
-) error {
+) (membership.WorkspaceRole, error) {
 	m, err := s.membershipProvider.GetMembership(ctx, userID, workspaceID)
 	if err != nil {
-		return fmt.Errorf("get membership: %w", err)
+		return "", fmt.Errorf("get membership: %w", err)
 	}
 
-	if !containsRole(m.Role, allowedRoles) {
-		return ErrForbidden
-	}
-
-	return nil
+	return m.Role, nil
 }
 
-// RequireBoardRole resolves the board's workspace and checks the user's role.
-func (s *Service) RequireBoardRole(
+// GetBoardRole resolves the board's workspace and returns the user's role.
+func (s *Service) GetBoardRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	boardID uuid.UUID,
-	allowedRoles ...membership.WorkspaceRole,
-) error {
+) (membership.WorkspaceRole, error) {
 	workspaceID, err := s.boardProvider.GetBoardWorkspaceID(ctx, boardID)
 	if err != nil {
-		return fmt.Errorf("get board workspace: %w", err)
+		return "", fmt.Errorf("get board workspace: %w", err)
 	}
 
-	return s.RequireWorkspaceRole(ctx, userID, workspaceID, allowedRoles...)
+	return s.GetWorkspaceRole(ctx, userID, workspaceID)
 }
 
-// RequireColumnRole resolves the column's board and workspace, then checks the user's role.
-func (s *Service) RequireColumnRole(
+// GetColumnRole resolves the column's board and workspace, then returns the user's role.
+func (s *Service) GetColumnRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	columnID uuid.UUID,
-	allowedRoles ...membership.WorkspaceRole,
-) error {
+) (membership.WorkspaceRole, error) {
 	boardID, err := s.columnProvider.GetColumnBoardID(ctx, columnID)
 	if err != nil {
-		return fmt.Errorf("get column board: %w", err)
+		return "", fmt.Errorf("get column board: %w", err)
 	}
 
-	return s.RequireBoardRole(ctx, userID, boardID, allowedRoles...)
-}
-
-// containsRole checks if the given role is in the list of allowed roles.
-func containsRole(role membership.WorkspaceRole, allowedRoles []membership.WorkspaceRole) bool {
-	for _, allowed := range allowedRoles {
-		if role == allowed {
-			return true
-		}
-	}
-	return false
+	return s.GetBoardRole(ctx, userID, boardID)
 }
