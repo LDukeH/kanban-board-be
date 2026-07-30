@@ -55,6 +55,14 @@ func (s *Server) MountHandlers() {
                 r.Patch("/{id}", s.boardHandler.UpdateBoard)
                 r.Delete("/{id}", s.boardHandler.DeleteBoard)
 			})
+
+			// Membership inside workspace
+			r.Route("/{workspaceID}/members", func(r chi.Router) {
+				r.Post("/", s.membershipHandler.CreateMembership)
+				r.Get("/", s.membershipHandler.GetMembershipsByWorkspaceID)
+				r.Patch("/{id}", s.membershipHandler.ChangeMemberRole)
+				r.Delete("/{id}", s.membershipHandler.RemoveMember)
+			})
 		})
 
 		// Boards

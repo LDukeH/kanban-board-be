@@ -6,6 +6,7 @@ import (
 	"kanban-board-be/internal/feature/auth"
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
+	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
 )
@@ -24,6 +25,10 @@ type Server struct{
 	workspaceHandler *workspace.Handler
 	workspaceService *workspace.Service
 
+	// membershipHandler *membership.Handler
+	membershipHandler *membership.Handler
+	membershipService *membership.Service
+
 	// boardHandler *board.Handler
 	boardHandler *board.Handler
 	boardService *board.Service
@@ -39,6 +44,8 @@ func CreateNewServer(
 	authService *auth.Service,
 	workspaceHandler *workspace.Handler,
 	workspaceService *workspace.Service,
+	membershipHandler *membership.Handler,
+	membershipService *membership.Service,
 	boardHandler *board.Handler,
 	boardService *board.Service,
 	columnHandler *column.Handler,
@@ -50,6 +57,8 @@ func CreateNewServer(
 		authService: authService,
 		workspaceHandler: workspaceHandler,
 		workspaceService: workspaceService,
+		membershipHandler: membershipHandler,
+		membershipService: membershipService,
 		boardHandler: boardHandler,
 		boardService: boardService,
 		columnHandler: columnHandler,

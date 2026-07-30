@@ -46,34 +46,41 @@ func main() {
 		Expiration: 24 * time.Hour,
 	}
 
-	authService := auth.NewService(userService, authConfig)
-	authHandler := auth.NewHandler(authService)
-
-	// Workspace injection
-	workspaceRepo := workspace.NewRepository(pool)
-	membershipRepo := membership.NewRepository(pool)
 	
 
-	// Board injection
+	// Repo
+	workspaceRepo := workspace.NewRepository(pool)
+	membershipRepo := membership.NewRepository(pool)
 	boardRepo := board.NewRepository(pool)
-
-	// Column injection
 	columnRepo := column.NewRepository(pool)
-
 	// Authorization injection
 	authzService := authz.NewService(workspaceRepo, boardRepo, columnRepo)
-
+	authService := auth.NewService(userService, authConfig)
+	authHandler := auth.NewHandler(authService)
+	
+	// Board
 	boardService := board.NewService(boardRepo, authzService)
 	boardHandler := board.NewHandler(boardService)
 
+	// Column 
 	columnService := column.NewService(boardRepo, columnRepo, authzService)
 	columnHandler := column.NewHandler(columnService)
 
+	
+	// Workspace injection
 	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)
 	workspaceHandler := workspace.NewHandler(workspaceService)
+	
+	membershipService := membership.NewService(membershipRepo)
+	membershipHandler := membership.NewHandler(membershipService)
 
 	// Create server
-	s := server.CreateNewServer(userHandler, authHandler, authService, workspaceHandler, workspaceService, boardHandler, boardService, columnHandler, columnService)
+	s := server.CreateNewServer(
+		userHandler, authHandler, authService, 
+		workspaceHandler, workspaceService, 
+		membershipHandler, membershipService,
+		boardHandler, boardService, 
+		columnHandler, columnService)
 	s.MountHandlers()
 
 	// Start HTTP server
