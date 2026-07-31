@@ -19,6 +19,7 @@ import (
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/membership"
+	"kanban-board-be/internal/feature/task"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
 )
@@ -53,8 +54,9 @@ func main() {
 	membershipRepo := membership.NewRepository(pool)
 	boardRepo := board.NewRepository(pool)
 	columnRepo := column.NewRepository(pool)
+	taskRepo := task.NewRepository(pool)
 	// Authorization injection
-	authzService := authz.NewService(workspaceRepo, boardRepo, columnRepo)
+	authzService := authz.NewService(workspaceRepo, boardRepo, columnRepo, taskRepo)
 	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
 	
@@ -65,6 +67,10 @@ func main() {
 	// Column 
 	columnService := column.NewService(boardRepo, columnRepo, authzService)
 	columnHandler := column.NewHandler(columnService)
+
+	// Task
+	taskService := task.NewService(taskRepo, authzService)
+	taskHandler := task.NewHandler(taskService)
 
 	
 	// Workspace injection
@@ -80,15 +86,11 @@ func main() {
 		workspaceHandler, workspaceService, 
 		membershipHandler, membershipService,
 		boardHandler, boardService, 
-		columnHandler, columnService)
+		columnHandler, columnService,
+		taskHandler, taskService,)
 	s.MountHandlers()
 
 	// Start HTTP server
 	log.Fatal(http.ListenAndServe(":3000", s.Router))
 
-	_ = userRepo
-	_ = userService
-	_ = userHandler
-	_ = authService
-	_ = authHandler
 }

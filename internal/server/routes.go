@@ -1,9 +1,8 @@
 package server
 
 import (
-	"github.com/go-chi/chi/v5/middleware"
-
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 )
 
@@ -20,7 +19,6 @@ func (s *Server) MountHandlers() {
 
 	// Public routes
 
-
 	s.Router.Post("/auth/register", s.authHandler.RegisterHandler)
 	s.Router.Post("/auth/login", s.authHandler.LoginHandler)
 
@@ -34,6 +32,7 @@ func (s *Server) MountHandlers() {
 	})
 
 	// Protected API routes
+
 	s.Router.Group(func(r chi.Router) {
 		r.Use(s.authService.AuthMiddleware)
 
@@ -44,16 +43,14 @@ func (s *Server) MountHandlers() {
 		r.Route("/workspaces", func(r chi.Router) {
 			r.Post("/", s.workspaceHandler.CreateWorkspace)
 			r.Get("/", s.workspaceHandler.GetAllWorkspaces)
-			r.Get("/{id}", s.workspaceHandler.GetWorkspaceByID)
-			r.Patch("/{id}", s.workspaceHandler.UpdateWorkspace)
-			r.Delete("/{id}", s.workspaceHandler.DeleteWorkspace)
+			r.Get("/{workspaceID}", s.workspaceHandler.GetWorkspaceByID)
+			r.Patch("/{workspaceID}", s.workspaceHandler.UpdateWorkspace)
+			r.Delete("/{workspaceID}", s.workspaceHandler.DeleteWorkspace)
 
 			// Boards inside workspace
 			r.Route("/{workspaceID}/boards", func(r chi.Router) {
 				r.Post("/", s.boardHandler.CreateBoard)
 				r.Get("/", s.boardHandler.GetBoardsByWorkspaceID)
-                r.Patch("/{id}", s.boardHandler.UpdateBoard)
-                r.Delete("/{id}", s.boardHandler.DeleteBoard)
 			})
 
 			// Membership inside workspace
@@ -67,13 +64,35 @@ func (s *Server) MountHandlers() {
 
 		// Boards
 		r.Route("/boards", func(r chi.Router) {
-			r.Get("/{id}", s.boardHandler.GetBoardByID)
+			r.Get("/{boardID}", s.boardHandler.GetBoardByID)
+			r.Patch("/{boardID}", s.boardHandler.UpdateBoard)
+			r.Delete("/{boardID}", s.boardHandler.DeleteBoard)
 
 			// Columns inside board
 			r.Route("/{boardID}/columns", func(r chi.Router) {
 				r.Post("/", s.columnHandler.CreateColumn)
 				r.Get("/", s.columnHandler.GetColumnsByBoardID)
 			})
+		})
+
+		// Columns
+		r.Route("/columns", func(r chi.Router) {
+			r.Patch("/{columnID}", s.columnHandler.UpdateColumn)
+			r.Patch("/{columnID}/position", s.columnHandler.UpdateColumnPosition)
+			r.Delete("/{columnID}", s.columnHandler.DeleteColumn)
+
+			// Tasks inside column
+			r.Route("/{columnID}/tasks", func(r chi.Router) {
+				r.Post("/", s.taskHandler.CreateTask)
+				r.Get("/", s.taskHandler.GetTasksByColumnID)
+			})
+		})
+
+		// Tasks
+		r.Route("/tasks", func(r chi.Router) {
+			r.Patch("/{taskID}", s.taskHandler.UpdateTask)
+			r.Patch("/{taskID}/position", s.taskHandler.UpdateTaskPosition)
+			r.Delete("/{taskID}", s.taskHandler.DeleteTask)
 		})
 	})
 }

@@ -15,7 +15,10 @@ import (
 type columnRepository interface {
 	Create(ctx context.Context, column *Column) error
 	GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error)
-	GetByID(ctx context.Context, columnID string) (*Column, error)
+	GetByID(ctx context.Context, columnID uuid.UUID) (*Column, error)
+	UpdateColumnName(ctx context.Context, column *Column) error
+	UpdateColumnPosition(ctx context.Context, columnID uuid.UUID, newPosition int) error
+	DeleteColumn(ctx context.Context, columnID uuid.UUID) error
 }
 
 type boardRepository interface {
@@ -49,7 +52,7 @@ func (s *Service) CreateColumn(ctx context.Context, userID uuid.UUID, column *Co
 	return s.columnRepo.Create(ctx, column)
 }
 
-func (s *Service) GetColumnByID(ctx context.Context, columnID string) (*Column, error) {
+func (s *Service) GetColumnByID(ctx context.Context, columnID uuid.UUID) (*Column, error) {
 	return s.columnRepo.GetByID(ctx, columnID)
 }
 
@@ -65,4 +68,43 @@ func (s *Service) GetColumnsByBoardID(ctx context.Context, boardID uuid.UUID, us
 	}
 
 	return s.columnRepo.GetByBoardID(ctx, boardID)
+}
+
+func (s *Service) UpdateColumnName(ctx context.Context, userID uuid.UUID, column *Column) error {
+	role, err := s.authz.GetColumnRole(ctx,userID,column.ID)
+	if err != nil {
+		return err
+	}
+
+	if role != membership.Owner && role != membership.Admin {
+		return apperrors.ErrForbidden
+	}
+
+	return s.columnRepo.UpdateColumnName(ctx, column)
+}
+
+func (s *Service) UpdateColumnPosition(ctx context.Context, userID uuid.UUID, column *Column) error {
+	role, err := s.authz.GetColumnRole(ctx,userID,column.ID)
+	if err != nil {
+		return err
+	}
+
+	if role != membership.Owner && role != membership.Admin {
+		return apperrors.ErrForbidden
+	}
+	
+	return s.columnRepo.UpdateColumnPosition(ctx, column.ID, column.Position)
+}
+
+func (s *Service) DeleteColumn(ctx context.Context, userID uuid.UUID, columnID uuid.UUID) error {
+	role, err := s.authz.GetColumnRole(ctx,userID,columnID)
+	if err != nil {
+		return err
+	}
+
+	if role != membership.Owner && role != membership.Admin {
+		return apperrors.ErrForbidden
+	}
+
+	return s.columnRepo.DeleteColumn(ctx, columnID)
 }

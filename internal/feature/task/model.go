@@ -9,7 +9,7 @@ import (
 type Task struct {
     ID          uuid.UUID `json:"id"`
     ColumnID    uuid.UUID `json:"column_id"`
-    Title       string    `json:"title"`
+    Title       *string    `json:"title"`
     Description *string   `json:"description"`
     Position    int       `json:"position"`
     CreatedAt   time.Time `json:"created_at"`
@@ -24,4 +24,19 @@ type TaskAssignee struct {
 type TaskLabel struct {
     TaskID  uuid.UUID `json:"task_id"`
     LabelID uuid.UUID `json:"label_id"`
+}
+
+type TaskCreateRequest struct {
+    Title       *string `json:"title"`
+    Description *string `json:"description"`
+}
+
+type TaskUpdateRequest struct {
+    Title       *string `json:"title"`
+    Description *string `json:"description"`
+}
+
+type TaskPositionUpdateRequest struct {
+    ColumnID uuid.UUID `json:"column_id"`
+    Position int       `json:"position"`
 }

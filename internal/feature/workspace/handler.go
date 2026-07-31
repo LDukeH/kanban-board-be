@@ -42,7 +42,7 @@ func (h *Handler) GetAllWorkspaces(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetWorkspaceByID(w http.ResponseWriter, r *http.Request) {
 	// Extract the workspace ID from the URL path
-	id := chi.URLParam(r, "id")
+	id := chi.URLParam(r, "workspaceID")
 
 	// Check if the ID is a valid UUID
 	userID, err := auth.GetUserID(r)
@@ -105,7 +105,7 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	workspaceIDStr := chi.URLParam(r, "id")
+	workspaceIDStr := chi.URLParam(r, "workspaceID")
 	workspaceID, err := uuid.Parse(workspaceIDStr)
 
 	if err != nil {
@@ -136,14 +136,12 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(workspace)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	// Extract the workspace ID from the URL path
-	workspaceIDStr := chi.URLParam(r, "id")
+	workspaceIDStr := chi.URLParam(r, "workspaceID")
 	workspaceID, err := uuid.Parse(workspaceIDStr)
 	if err != nil {
 		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
@@ -163,9 +161,5 @@ func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNoContent)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Workspace deleted successfully",
-	})
 }

@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"context"
-	"log"
 
 	"github.com/google/uuid"
 
@@ -179,8 +178,6 @@ func (r *Repository) GetMembership(
 	ctx context.Context,
 	userID, workspaceID uuid.UUID,
 ) (*membership.WorkspaceMembership, error) {
-
-	log.Default().Println("GetMembership called with userID:", userID, "workspaceID:", workspaceID)
 	query := `
 		SELECT
 			user_id,

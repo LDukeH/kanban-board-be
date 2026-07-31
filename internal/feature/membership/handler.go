@@ -110,9 +110,7 @@ func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(workspaceMembership)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
@@ -149,9 +147,7 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(workspaceMembership)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) GetMembershipsByWorkspaceID(w http.ResponseWriter, r *http.Request) {

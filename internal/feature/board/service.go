@@ -68,6 +68,7 @@ func (s *Service) UpdateBoard(ctx context.Context, userID uuid.UUID, board *Boar
 	if err != nil {
 		return err
 	}
+
 	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
@@ -77,6 +78,7 @@ func (s *Service) UpdateBoard(ctx context.Context, userID uuid.UUID, board *Boar
 
 func (s *Service) DeleteBoard(ctx context.Context, userID uuid.UUID, boardID uuid.UUID) error {
 	role, err := s.authz.GetBoardRole(ctx, userID, boardID)
+	
 	if err != nil {
 		return err
 	}

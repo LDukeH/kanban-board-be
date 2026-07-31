@@ -50,12 +50,7 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK) // 200 OK
-
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "User registered successfully",
-	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +90,7 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
     SameSite: http.SameSiteLaxMode,
 })
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +104,8 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {

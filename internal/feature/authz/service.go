@@ -24,11 +24,17 @@ type ColumnBoardProvider interface {
 	GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (uuid.UUID, error)
 }
 
+// TaskColumnProvider can resolve a task ID to its column ID.
+type TaskColumnProvider interface {
+	GetTaskColumnID(ctx context.Context, taskID uuid.UUID) (uuid.UUID, error)
+}
+
 // Service provides authorization checks for workspace-scoped resources.
 type Service struct {
 	membershipProvider MembershipProvider
 	boardProvider      BoardWorkspaceProvider
 	columnProvider     ColumnBoardProvider
+	taskProvider       TaskColumnProvider
 }
 
 // NewService creates a new authorization service.
@@ -37,11 +43,13 @@ func NewService(
 	membershipProvider MembershipProvider,
 	boardProvider BoardWorkspaceProvider,
 	columnProvider ColumnBoardProvider,
+	taskProvider TaskColumnProvider,
 ) *Service {
 	return &Service{
 		membershipProvider: membershipProvider,
 		boardProvider:      boardProvider,
 		columnProvider:     columnProvider,
+		taskProvider:       taskProvider,
 	}
 }
 
@@ -86,3 +94,23 @@ func (s *Service) GetColumnRole(
 
 	return s.GetBoardRole(ctx, userID, boardID)
 }
+
+// GetTaskRole resolves the task's column, board, and workspace, then returns the user's role.
+func (s *Service) GetTaskRole(
+	ctx context.Context,
+	userID uuid.UUID,
+	taskID uuid.UUID,
+) (membership.WorkspaceRole, error) {
+	columnID, err := s.taskProvider.GetTaskColumnID(ctx, taskID)
+	if err != nil {
+		return "", fmt.Errorf("get task column: %w", err)
+	}
+
+	return s.GetColumnRole(ctx, userID, columnID)
+}
+
+// GetColumnBoardID returns the board ID for a given column.
+func (s *Service) GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (uuid.UUID, error) {
+	return s.columnProvider.GetColumnBoardID(ctx, columnID)
+}
+

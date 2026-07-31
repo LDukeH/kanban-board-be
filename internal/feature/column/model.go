@@ -1,9 +1,9 @@
 package column
 
 import (
-    "time"
+	"time"
 
-    "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 type Column struct {
@@ -17,4 +17,12 @@ type Column struct {
 
 type ColumnCreateRequest struct {
     Name     string `json:"name"`
+}
+
+type ColumnUpdateRequest struct {
+    Name     string `json:"name"`
+}
+
+type ColumnPositionUpdateRequest struct {
+    Position int `json:"position"`
 }

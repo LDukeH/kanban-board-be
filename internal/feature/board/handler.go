@@ -125,8 +125,12 @@ func (h *Handler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
 	var req BoardUpdateRequest
 
 	userID, err := auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	
-	boardIDStr := chi.URLParam(r, "id")
+	boardIDStr := chi.URLParam(r, "boardID")
 	boardID, err := uuid.Parse(boardIDStr)
 
 	if err != nil {
@@ -157,9 +161,7 @@ func (h *Handler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(board)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
@@ -185,10 +187,6 @@ func (h *Handler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Board deleted successfully",
-	})
+	w.WriteHeader(http.StatusNoContent)
 }
-
+	
