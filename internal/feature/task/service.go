@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/membership"
@@ -16,6 +17,10 @@ type taskRepository interface {
 	UpdateTaskPosition(ctx context.Context, task *Task) error
 	DeleteTask(ctx context.Context, taskID uuid.UUID) error
 	GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error)
+	AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
+	RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
+	IsUserAssignedToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (bool, error)
+	GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]*UsersTaskResponse, error)
 }
 
 type Service struct {
@@ -115,4 +120,61 @@ func (s *Service) GetTasksByColumnID(ctx context.Context, columnID uuid.UUID, us
 	}
 
 	return s.taskRepo.GetByColumnID(ctx, columnID)
+}
+
+func (s *Service) AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, assignedUserID uuid.UUID) error {
+	role, err := s.authz.GetTaskRole(ctx, userID, taskID)
+
+	if err != nil {
+		return err
+	}
+
+	if role != membership.Owner && role != membership.Admin && role != membership.Member {
+		return apperrors.ErrForbidden
+	}
+
+	roleAssignedUser, err := s.authz.GetTaskRole(ctx, assignedUserID, taskID)
+	if err != nil {
+		return err
+	}
+
+	if roleAssignedUser != membership.Owner && roleAssignedUser != membership.Admin && roleAssignedUser != membership.Member {
+		fmt.Println("Assigned user is not a member of the workspace")
+		return apperrors.ErrForbidden
+	}
+
+	return s.taskRepo.AssignUserToTask(ctx, taskID, assignedUserID)
+}
+
+func (s *Service) RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, removedUserID uuid.UUID) error {
+	role, err := s.authz.GetTaskRole(ctx, userID, taskID)
+
+	if(err != nil) {
+		return err
+	}
+
+	isSelfRemoval := userID == removedUserID
+
+	if !isSelfRemoval && role != membership.Owner && role != membership.Admin {
+		return apperrors.ErrForbidden
+	}
+
+	isAssigned, err := s.taskRepo.IsUserAssignedToTask(ctx, taskID, removedUserID)
+	if err != nil {
+		return err
+	}
+	if( !isAssigned) {
+		fmt.Println("User is not assigned to this task")
+		return apperrors.ErrNotFound
+	}
+
+	return s.taskRepo.RemoveUserFromTask(ctx, taskID, removedUserID)
+}
+
+func (s *Service) GetUsersByTaskID(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) ([]*UsersTaskResponse, error) {
+	// Check if the user has access to the task's column, board, and workspace
+	if _, err := s.authz.GetTaskRole(ctx, userID, taskID); err != nil {
+		return nil, err
+	}
+	return s.taskRepo.GetUsersByTaskID(ctx, taskID)
 }

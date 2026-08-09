@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/user"
 	"log"
 	"net/http"
 
@@ -16,12 +17,14 @@ import (
 type Handler struct {
 	taskService *Service
 	labelService *label.Service
+	userService *user.Service
 }
 
-func NewHandler(service *Service, labelService *label.Service) *Handler {
+func NewHandler(service *Service, labelService *label.Service, userService *user.Service) *Handler {
 	return &Handler{
 		taskService: service,
 		labelService: labelService,
+		userService: userService,
 	}
 }
 
@@ -285,3 +288,104 @@ func (h *Handler) RemoveLabelFromTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) AssignUserToTask(w http.ResponseWriter, r *http.Request) {
+	var req TaskAssignUserRequest
+
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get task ID from URL
+	taskIDStr := chi.URLParam(r, "taskID")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		log.Printf("ERROR: Failed to find user by email: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	if err := h.taskService.AssignUserToTask(r.Context(),  taskID, userID, req.UserID); err != nil {
+		log.Printf("ERROR: Failed to assign user to task: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) RemoveUserFromTask(w http.ResponseWriter, r *http.Request) {
+	var req TaskRemoveUserRequest
+	userID, err := auth.GetUserID(r)
+
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get task ID from URL
+	taskIDStr := chi.URLParam(r, "taskID")
+	taskID, err := uuid.Parse(taskIDStr)
+
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		log.Printf("ERROR: Failed to find user by email: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	if err := h.taskService.RemoveUserFromTask(r.Context(), taskID, userID, req.UserID); err != nil {
+		log.Printf("ERROR: Failed to remove user from task: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) GetUsersByTaskID(w http.ResponseWriter, r *http.Request) {
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get task ID from URL
+	taskIDStr := chi.URLParam(r, "taskID")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	users, err := h.taskService.GetUsersByTaskID(r.Context(), taskID, userID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get users by task ID: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(users)
+}

@@ -111,6 +111,13 @@ func (s *Server) MountHandlers() {
 			r.Post("/", s.taskHandler.AddLabelToTask)
 			r.Delete("/{labelID}", s.taskHandler.RemoveLabelFromTask)
 		})
+
+		// Users assigned to task
+		r.Route("/{taskID}/users", func(r chi.Router) {
+			r.Get("/", s.taskHandler.GetUsersByTaskID)
+			r.Post("/", s.taskHandler.AssignUserToTask)
+			r.Delete("/", s.taskHandler.RemoveUserFromTask)
+		})
 	})
 	})
 }

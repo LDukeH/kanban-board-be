@@ -397,3 +397,78 @@ func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID) error {
 
 	return nil
 }
+
+func (r *Repository) AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
+	query := `
+		INSERT INTO task_assignees (task_id, user_id)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`
+
+	_, err := r.pool.Exec(ctx, query, taskID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to assign user to task: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
+	query := `
+		DELETE FROM task_assignees
+		WHERE task_id = $1 AND user_id = $2
+	`
+
+	_, err := r.pool.Exec(ctx, query, taskID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to remove user from task: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) IsUserAssignedToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM task_assignees
+			WHERE task_id = $1 AND user_id = $2
+		)
+	`
+
+	var exists bool
+	err := r.pool.QueryRow(ctx, query, taskID, userID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check user assignment: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (r *Repository) GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]*UsersTaskResponse, error) {
+	query := `
+		SELECT u.id, u.email
+		FROM users u
+		JOIN task_assignees ta ON u.id = ta.user_id
+		WHERE ta.task_id = $1
+	`
+	rows, err := r.pool.Query(ctx, query, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users by task ID: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*UsersTaskResponse
+	for rows.Next() {
+		user := &UsersTaskResponse{}
+		err := rows.Scan(&user.UserID, &user.Email)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over user rows: %w", err)
+	}
+	return users, nil
+}

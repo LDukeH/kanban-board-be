@@ -75,7 +75,7 @@ func main() {
 	
 	// Task
 	taskService := task.NewService(taskRepo, authzService)
-	taskHandler := task.NewHandler(taskService, labelService)
+	taskHandler := task.NewHandler(taskService, labelService, userService)
 	
 	// Workspace injection
 	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)

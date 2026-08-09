@@ -47,3 +47,16 @@ type TaskPositionUpdateRequest struct {
 type TaskLabelCreateRequest struct {
     LabelID uuid.UUID `json:"label_id"`
 }
+
+type TaskAssignUserRequest struct {
+    UserID uuid.UUID `json:"user_id"`
+}
+
+type TaskRemoveUserRequest struct {
+    UserID uuid.UUID `json:"user_id"`
+}
+
+type UsersTaskResponse struct {
+    Email string `json:"email"`
+    UserID uuid.UUID `json:"user_id"`
+}
