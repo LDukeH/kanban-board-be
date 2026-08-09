@@ -132,99 +132,117 @@ func (r *Repository) UpdateColumnName(ctx context.Context, column *Column) error
 	return nil
 }
 
-func (r *Repository) UpdateColumnPosition(
-    ctx context.Context,
-    columnID uuid.UUID,
-    newPosition int,
-) error{
-	column, err := r.GetByID(ctx, columnID)
-	if err != nil {
-		return fmt.Errorf("failed to get column by ID: %w", err)
-	}
+func (r *Repository) UpdateColumnPosition(ctx context.Context, columnID uuid.UUID, newPosition int) error {
+    tx, err := r.pool.Begin(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback(ctx)
 
-	boardID := column.BoardID
-	oldPosition := column.Position
+    var boardID uuid.UUID
+    var oldPosition int
 
-	if newPosition == oldPosition {
-		return nil // No change needed
-	}
+    // Lock row inside transaction
+    err = tx.QueryRow(
+        ctx,
+        `SELECT board_id, position FROM columns WHERE id = $1 FOR UPDATE`,
+        columnID,
+    ).Scan(&boardID, &oldPosition)
+    if err != nil {
+        return fmt.Errorf("failed to lock column: %w", err)
+    }
 
+    if newPosition == oldPosition {
+        return nil
+    }
+
+    if newPosition > oldPosition {
+        _, err = tx.Exec(ctx, `
+            UPDATE columns
+            SET position = position - 1, updated_at = NOW()
+            WHERE board_id = $1 AND position > $2 AND position <= $3
+        `, boardID, oldPosition, newPosition)
+    } else {
+        _, err = tx.Exec(ctx, `
+            UPDATE columns
+            SET position = position + 1, updated_at = NOW()
+            WHERE board_id = $1 AND position >= $2 AND position < $3
+        `, boardID, newPosition, oldPosition)
+    }
+    if err != nil {
+        return fmt.Errorf("failed to reorder surrounding columns: %w", err)
+    }
+
+    _, err = tx.Exec(ctx, `
+        UPDATE columns SET position = $1, updated_at = NOW() WHERE id = $2
+    `, newPosition, columnID)
+    if err != nil {
+        return fmt.Errorf("failed to update moved column: %w", err)
+    }
+
+    return tx.Commit(ctx)
+}
+
+func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-
 	defer tx.Rollback(ctx)
 
-	// Update the position of the column being moved
-	if newPosition > oldPosition {
-        _, err = tx.Exec(
-            ctx,
-            `
-                UPDATE columns
-                SET position = position - 1,
-                    updated_at = NOW()
-                WHERE board_id = $1
-                  AND position > $2
-                  AND position <= $3
-            `,
-            boardID,
-            oldPosition,
-            newPosition,
-        )
-    } else {
-        _, err = tx.Exec(
-            ctx,
-            `
-                UPDATE columns
-                SET position = position + 1,
-                    updated_at = NOW()
-                WHERE board_id = $1
-                  AND position >= $2
-                  AND position < $3
-            `,
-            boardID,
-            newPosition,
-            oldPosition,
-        )
-    }
+	// Get the position and board id
+	var boardID uuid.UUID
+	var position int
+
+	err = tx.QueryRow(
+		ctx,
+		`
+		SELECT board_id, position
+		FROM columns
+		WHERE id = $1
+		`,
+		columnID,
+	).Scan(&boardID, &position)
+
 	if err != nil {
-        return fmt.Errorf("failed to reorder columns: %w", err)
-    }
+		return fmt.Errorf("failed to get column before deletion: %w", err)
+	}
 
-	// Move target column
-    _, err = tx.Exec(
-        ctx,
-        `
-            UPDATE columns
-            SET position = $1,
-                updated_at = NOW()
-            WHERE id = $2
-        `,
-        newPosition,
-        columnID,
-    )
-    if err != nil {
-        return fmt.Errorf("failed to update column position: %w", err)
-    }
-
-    //Commit
-    if err := tx.Commit(ctx); err != nil {
-        return fmt.Errorf("failed to commit column move: %w", err)
-    }
-
-    return nil
-}
-
-func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID) error {
-	query := `
+	// Delete the column.
+	_, err = tx.Exec(
+		ctx,
+		`
 		DELETE FROM columns
 		WHERE id = $1
-	`
+		`,
+		columnID,
+	)
 
-	_, err := r.pool.Exec(ctx, query, columnID)
 	if err != nil {
 		return fmt.Errorf("failed to delete column: %w", err)
 	}
+
+	// Shift other columns' positions
+	_, err = tx.Exec(
+		ctx,
+		`
+		UPDATE columns
+		SET position = position - 1,
+		    updated_at = NOW()
+		WHERE board_id = $1
+		  AND position > $2
+		`,
+		boardID,
+		position,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to reorder columns after deletion: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit column deletion: %w", err)
+	}
+
 	return nil
 }

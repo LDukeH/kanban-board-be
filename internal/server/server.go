@@ -6,6 +6,7 @@ import (
 	"kanban-board-be/internal/feature/auth"
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
+	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/task"
 	"kanban-board-be/internal/feature/user"
@@ -41,6 +42,10 @@ type Server struct{
 	// taskHandler *task.Handler
 	taskHandler *task.Handler
 	taskService *task.Service
+
+	// labelHandler *label.Handler
+	labelHandler *label.Handler
+	labelService *label.Service
 }
 
 func CreateNewServer(
@@ -57,6 +62,8 @@ func CreateNewServer(
 	columnService *column.Service,
 	taskHandler *task.Handler,
 	taskService *task.Service,
+	labelHandler *label.Handler,
+	labelService *label.Service,
 ) *Server{
 	s := &Server{
 		userHandler: userHandler,
@@ -72,6 +79,8 @@ func CreateNewServer(
 		columnService: columnService,
 		taskHandler: taskHandler,
 		taskService: taskService,
+		labelHandler: labelHandler,
+		labelService: labelService,
 	}
 	s.Router = chi.NewRouter()
 	return s

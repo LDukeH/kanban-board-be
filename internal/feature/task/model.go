@@ -1,6 +1,7 @@
 package task
 
 import (
+	"kanban-board-be/internal/feature/label"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,8 @@ type Task struct {
     Position    int       `json:"position"`
     CreatedAt   time.Time `json:"created_at"`
     UpdatedAt   time.Time `json:"updated_at"`
+    
+    Labels    []label.Label    `json:"labels,omitempty"`
 }
 
 type TaskAssignee struct {
@@ -39,4 +42,8 @@ type TaskUpdateRequest struct {
 type TaskPositionUpdateRequest struct {
     ColumnID uuid.UUID `json:"column_id"`
     Position int       `json:"position"`
+}
+
+type TaskLabelCreateRequest struct {
+    LabelID uuid.UUID `json:"label_id"`
 }

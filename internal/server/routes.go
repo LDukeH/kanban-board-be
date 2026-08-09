@@ -11,19 +11,17 @@ func (s *Server) MountHandlers() {
 
 	s.Router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS","PATCH"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
 	// Public routes
-
 	s.Router.Post("/auth/register", s.authHandler.RegisterHandler)
 	s.Router.Post("/auth/login", s.authHandler.LoginHandler)
 
 	// Protected auth routes
-
 	s.Router.Group(func(r chi.Router) {
 		r.Use(s.authService.AuthMiddleware)
 
@@ -32,7 +30,6 @@ func (s *Server) MountHandlers() {
 	})
 
 	// Protected API routes
-
 	s.Router.Group(func(r chi.Router) {
 		r.Use(s.authService.AuthMiddleware)
 
@@ -73,6 +70,12 @@ func (s *Server) MountHandlers() {
 				r.Post("/", s.columnHandler.CreateColumn)
 				r.Get("/", s.columnHandler.GetColumnsByBoardID)
 			})
+
+			// Labels inside board
+			r.Route("/{boardID}/labels", func(r chi.Router) {
+				r.Post("/", s.labelHandler.CreateLabel)
+				r.Get("/", s.labelHandler.GetLabelsByBoardID)
+			})
 		})
 
 		// Columns
@@ -88,11 +91,25 @@ func (s *Server) MountHandlers() {
 			})
 		})
 
+		// Labels
+		r.Route("/labels", func(r chi.Router) {
+			r.Get("/{labelID}", s.labelHandler.GetLabelByID)
+			r.Patch("/{labelID}", s.labelHandler.UpdateLabel)
+			r.Delete("/{labelID}", s.labelHandler.DeleteLabel)
+		})
+
 		// Tasks
 		r.Route("/tasks", func(r chi.Router) {
-			r.Patch("/{taskID}", s.taskHandler.UpdateTask)
-			r.Patch("/{taskID}/position", s.taskHandler.UpdateTaskPosition)
-			r.Delete("/{taskID}", s.taskHandler.DeleteTask)
+		r.Patch("/{taskID}", s.taskHandler.UpdateTask)
+		r.Patch("/{taskID}/position", s.taskHandler.UpdateTaskPosition)
+		r.Delete("/{taskID}", s.taskHandler.DeleteTask)
+
+		// Labels attached to task
+		r.Route("/{taskID}/labels", func(r chi.Router) {
+			r.Get("/", s.taskHandler.GetLabelsByTaskID)
+			r.Post("/", s.taskHandler.AddLabelToTask)
+			r.Delete("/{labelID}", s.taskHandler.RemoveLabelFromTask)
 		})
+	})
 	})
 }

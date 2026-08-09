@@ -9,15 +9,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"kanban-board-be/internal/feature/label"
 )
 
 type Handler struct {
-	service *Service
+	taskService *Service
+	labelService *label.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, labelService *label.Service) *Handler {
 	return &Handler{
-		service: service,
+		taskService: service,
+		labelService: labelService,
 	}
 }
 
@@ -56,7 +60,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 	}
 
-	if err := h.service.CreateTask(r.Context(), userID, &task); err != nil {
+	if err := h.taskService.CreateTask(r.Context(), userID, &task); err != nil {
 		log.Printf("ERROR: Failed to create task: %v", err)
 		apperrors.WriteError(w, err)
 		return
@@ -96,7 +100,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 	}
 
-	if err := h.service.UpdateTask(r.Context(), userID, &task); err != nil {
+	if err := h.taskService.UpdateTask(r.Context(), userID, &task); err != nil {
 		log.Printf("ERROR: Failed to update task: %v", err)
 		apperrors.WriteError(w, err)
 		return
@@ -133,7 +137,7 @@ func (h *Handler) UpdateTaskPosition(w http.ResponseWriter, r *http.Request) {
 	}
 
 
-	if err := h.service.UpdateTaskPosition(r.Context(), userID, &task); err != nil {
+	if err := h.taskService.UpdateTaskPosition(r.Context(), userID, &task); err != nil {
 		log.Printf("ERROR: Failed to update task position: %v", err)
 		apperrors.WriteError(w, err)
 		return
@@ -156,7 +160,7 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.DeleteTask(r.Context(), userID, taskID); err != nil {
+	if err := h.taskService.DeleteTask(r.Context(), userID, taskID); err != nil {
 		log.Printf("ERROR: Failed to delete task: %v", err)
 		apperrors.WriteError(w, err)
 		return
@@ -180,7 +184,7 @@ func (h *Handler) GetTasksByColumnID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, err := h.service.GetTasksByColumnID(r.Context(), columnID, userID)
+	tasks, err := h.taskService.GetTasksByColumnID(r.Context(), columnID, userID)
 	if err != nil {
 		log.Printf("ERROR: Failed to get tasks by column ID: %v", err)
 		apperrors.WriteError(w, err)
@@ -191,3 +195,93 @@ func (h *Handler) GetTasksByColumnID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(tasks)
 }
+
+func (h *Handler) GetLabelsByTaskID(w http.ResponseWriter, r *http.Request) {
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	taskIDStr := chi.URLParam(r, "taskID")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	labels, err := h.labelService.GetLabelsByTaskID(r.Context(), userID, taskID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get labels for task: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(labels)
+}
+
+func (h *Handler) AddLabelToTask(w http.ResponseWriter, r *http.Request) {
+	var req TaskLabelCreateRequest
+
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get task ID from URL
+	taskIDStr := chi.URLParam(r, "taskID")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.labelService.AddLabelToTask(r.Context(), userID, taskID, req.LabelID); err != nil {
+		log.Printf("ERROR: Failed to add label to task: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *Handler) RemoveLabelFromTask(w http.ResponseWriter, r *http.Request) {
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get task ID from URL
+	taskIDStr := chi.URLParam(r, "taskID")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get label ID from URL
+	labelIDStr := chi.URLParam(r, "labelID")
+	labelID, err := uuid.Parse(labelIDStr)
+	if err != nil {
+		http.Error(w, "Invalid label ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.labelService.RemoveLabelFromTask(r.Context(), userID, taskID, labelID); err != nil {
+		log.Printf("ERROR: Failed to remove label from task: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+

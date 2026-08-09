@@ -2,11 +2,14 @@ package authz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/membership"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // MembershipProvider can load a workspace membership for a user.
@@ -29,12 +32,18 @@ type TaskColumnProvider interface {
 	GetTaskColumnID(ctx context.Context, taskID uuid.UUID) (uuid.UUID, error)
 }
 
+// LabelBoardProvider can resolve a label ID to its board ID.
+type LabelBoardProvider interface {
+	GetLabelBoardID(ctx context.Context, labelID uuid.UUID) (uuid.UUID, error)
+}
+
 // Service provides authorization checks for workspace-scoped resources.
 type Service struct {
 	membershipProvider MembershipProvider
 	boardProvider      BoardWorkspaceProvider
 	columnProvider     ColumnBoardProvider
 	taskProvider       TaskColumnProvider
+	labelProvider      LabelBoardProvider
 }
 
 // NewService creates a new authorization service.
@@ -44,12 +53,14 @@ func NewService(
 	boardProvider BoardWorkspaceProvider,
 	columnProvider ColumnBoardProvider,
 	taskProvider TaskColumnProvider,
+	labelProvider LabelBoardProvider,
 ) *Service {
 	return &Service{
 		membershipProvider: membershipProvider,
 		boardProvider:      boardProvider,
 		columnProvider:     columnProvider,
 		taskProvider:       taskProvider,
+		labelProvider:      labelProvider,
 	}
 }
 
@@ -61,6 +72,9 @@ func (s *Service) GetWorkspaceRole(
 ) (membership.WorkspaceRole, error) {
 	m, err := s.membershipProvider.GetMembership(ctx, userID, workspaceID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", apperrors.ErrForbidden
+		}
 		return "", fmt.Errorf("get membership: %w", err)
 	}
 
@@ -91,7 +105,6 @@ func (s *Service) GetColumnRole(
 	if err != nil {
 		return "", fmt.Errorf("get column board: %w", err)
 	}
-
 	return s.GetBoardRole(ctx, userID, boardID)
 }
 
@@ -105,8 +118,20 @@ func (s *Service) GetTaskRole(
 	if err != nil {
 		return "", fmt.Errorf("get task column: %w", err)
 	}
-
 	return s.GetColumnRole(ctx, userID, columnID)
+}
+
+// GetLabelRole resolves the label's board and workspace, then returns the user's role.
+func (s *Service) GetLabelRole(
+	ctx context.Context,
+	userID uuid.UUID,
+	labelID uuid.UUID,
+) (membership.WorkspaceRole, error) {
+	boardID, err := s.labelProvider.GetLabelBoardID(ctx, labelID)
+	if err != nil {
+		return "", fmt.Errorf("get label board: %w", err)
+	}
+	return s.GetBoardRole(ctx, userID, boardID)
 }
 
 // GetColumnBoardID returns the board ID for a given column.

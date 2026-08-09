@@ -358,46 +358,51 @@ BEGIN
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_dev_board_id, 'Bug')
+        (gen_random_uuid(), v_dev_board_id, 'Bug', '#e5484d')
     RETURNING id INTO v_bug_label_id;
 
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_dev_board_id, 'Feature')
+        (gen_random_uuid(), v_dev_board_id, 'Feature', '#30a46c')
     RETURNING id INTO v_feature_label_id;
 
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_dev_board_id, 'Backend')
+        (gen_random_uuid(), v_dev_board_id, 'Backend', '#3e63dd')
     RETURNING id INTO v_backend_label_id;
 
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_dev_board_id, 'Frontend')
+        (gen_random_uuid(), v_dev_board_id, 'Frontend', '#8e4ec6')
     RETURNING id INTO v_frontend_label_id;
 
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_dev_board_id, 'Urgent')
+        (gen_random_uuid(), v_dev_board_id, 'Urgent', '#f76b15')
     RETURNING id INTO v_urgent_label_id;
 
 
@@ -408,28 +413,31 @@ BEGIN
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_marketing_board_id, 'Marketing')
+        (gen_random_uuid(), v_marketing_board_id, 'Marketing', '#e5484d')
     RETURNING id INTO v_marketing_label_id;
 
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_marketing_board_id, 'Content')
+        (gen_random_uuid(), v_marketing_board_id, 'Content', '#30a46c')
     RETURNING id INTO v_content_label_id;
 
     INSERT INTO labels (
         id,
         board_id,
-        name
+        name,
+        color
     )
     VALUES
-        (gen_random_uuid(), v_marketing_board_id, 'Campaign')
+        (gen_random_uuid(), v_marketing_board_id, 'Campaign', '#3e63dd')
     RETURNING id INTO v_campaign_label_id;
 
 

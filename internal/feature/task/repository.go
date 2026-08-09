@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -65,29 +66,57 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 }
 
 func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error) {
-	query :=
-		`SELECT
-			id,
-			column_id,
-			title,
-			description,
-			position,
-			created_at,
-			updated_at
-		FROM tasks
-		WHERE column_id = $1
-		ORDER BY position ASC`
-
+	query := `
+	SELECT
+		t.id,
+		t.column_id,
+		t.title,
+		t.description,
+		t.position,
+		t.created_at,
+		t.updated_at,
+		COALESCE(
+			json_agg(
+				json_build_object(
+					'id', l.id,
+					'board_id', l.board_id,
+					'name', l.name,
+					'color', l.color,
+					'created_at', l.created_at,
+					'updated_at', l.updated_at
+				)
+				ORDER BY l.name
+			) FILTER (WHERE l.id IS NOT NULL),
+			'[]'
+		) AS labels
+	FROM tasks t
+	LEFT JOIN task_labels tl
+		ON tl.task_id = t.id
+	LEFT JOIN labels l
+		ON l.id = tl.label_id
+	WHERE t.column_id = $1
+	GROUP BY
+		t.id,
+		t.column_id,
+		t.title,
+		t.description,
+		t.position,
+		t.created_at,
+		t.updated_at
+	ORDER BY t.position ASC
+	`
 	tasks := []*Task{}
-	rows, err := r.pool.Query(ctx, query, columnID)	
+	rows, err := r.pool.Query(ctx, query, columnID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		task := &Task{}
+		var labelsJSON []byte
+
 		err := rows.Scan(
 			&task.ID,
 			&task.ColumnID,
@@ -96,10 +125,16 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			&task.Position,
 			&task.CreatedAt,
 			&task.UpdatedAt,
+			&labelsJSON,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		if err := json.Unmarshal(labelsJSON, &task.Labels); err != nil {
+			return nil, fmt.Errorf("error unmarshalling task labels: %w", err)
+		}
+
 		tasks = append(tasks, task)
 	}
 
@@ -302,13 +337,63 @@ func (r *Repository) GetTaskColumnID(ctx context.Context, taskID uuid.UUID) (uui
 }
 
 func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID) error {
-	query := `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Get the position and column id of the task to be deleted
+	var columnID uuid.UUID
+	var position int
+
+	err = tx.QueryRow(
+		ctx,
+		`
+		SELECT column_id, position
+		FROM tasks
+		WHERE id = $1
+		`,
+		taskID,
+	).Scan(&columnID, &position)
+
+	if err != nil {
+		return fmt.Errorf("failed to get task before deletion: %w", err)
+	}
+
+	// Delete the task
+	_, err = tx.Exec(
+		ctx,
+		`
 		DELETE FROM tasks
 		WHERE id = $1
-	`
-	_, err := r.pool.Exec(ctx, query, taskID)
+		`,
+		taskID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}
+
+	// Shift other tasks' positions
+	_, err = tx.Exec(
+		ctx,
+		`
+		UPDATE tasks
+		SET position = position - 1,
+		    updated_at = NOW()
+		WHERE column_id = $1
+		  AND position > $2
+		`,
+		columnID,
+		position,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to reorder tasks after deletion: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit task deletion: %w", err)
+	}
+
 	return nil
 }

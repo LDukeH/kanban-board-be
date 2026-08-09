@@ -18,6 +18,7 @@ import (
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
+	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/task"
 	"kanban-board-be/internal/feature/user"
@@ -47,16 +48,15 @@ func main() {
 		Expiration: 24 * time.Hour,
 	}
 
-	
-
 	// Repo
 	workspaceRepo := workspace.NewRepository(pool)
 	membershipRepo := membership.NewRepository(pool)
 	boardRepo := board.NewRepository(pool)
 	columnRepo := column.NewRepository(pool)
 	taskRepo := task.NewRepository(pool)
+	labelRepo := label.NewRepository(pool)
 	// Authorization injection
-	authzService := authz.NewService(workspaceRepo, boardRepo, columnRepo, taskRepo)
+	authzService := authz.NewService(membershipRepo, boardRepo, columnRepo, taskRepo, labelRepo)
 	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
 	
@@ -68,10 +68,14 @@ func main() {
 	columnService := column.NewService(boardRepo, columnRepo, authzService)
 	columnHandler := column.NewHandler(columnService)
 
+
+	// Label
+	labelService := label.NewService(labelRepo, authzService)
+	labelHandler := label.NewHandler(labelService)
+	
 	// Task
 	taskService := task.NewService(taskRepo, authzService)
-	taskHandler := task.NewHandler(taskService)
-
+	taskHandler := task.NewHandler(taskService, labelService)
 	
 	// Workspace injection
 	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)
@@ -87,7 +91,8 @@ func main() {
 		membershipHandler, membershipService,
 		boardHandler, boardService, 
 		columnHandler, columnService,
-		taskHandler, taskService,)
+		taskHandler, taskService,
+		labelHandler, labelService,)
 	s.MountHandlers()
 
 	// Start HTTP server

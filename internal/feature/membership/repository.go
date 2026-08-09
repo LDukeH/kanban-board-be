@@ -2,13 +2,12 @@ package membership
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"fmt"
 )
 
 type Repository struct {
@@ -99,6 +98,15 @@ func (r *Repository) GetByID(
 	return membership, nil
 }
 
+// GetMembership satisfies the authz.MembershipProvider interface.
+func (r *Repository) GetMembership(
+	ctx context.Context,
+	userID uuid.UUID,
+	workspaceID uuid.UUID,
+) (*WorkspaceMembership, error) {
+	return r.GetByUserAndWorkspaceID(ctx, userID, workspaceID)
+}
+
 func (r *Repository) GetByUserAndWorkspaceID(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -123,13 +131,15 @@ func (r *Repository) GetByUserAndWorkspaceID(
 		userID,
 		workspaceID,
 	).Scan(
-		&membership.ID,
-		&membership.WorkspaceID,
-		&membership.UserID,
-		&membership.Role,
-		&membership.CreatedAt,
-		&membership.UpdatedAt,
-	)
+    &membership.ID,          
+    &membership.WorkspaceID, 
+    &membership.UserID,      
+    &membership.Role,       
+    &membership.CreatedAt,   
+    &membership.UpdatedAt,  
+)
+	fmt.Println("userId:", userID)
+	fmt.Println("workspaceId:", workspaceID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace membership by user and workspace ID: %w", err)

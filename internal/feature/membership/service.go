@@ -2,9 +2,12 @@ package membership
 
 import (
 	"context"
+	"errors"
+
 	"kanban-board-be/internal/apperrors"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type membershipRepository interface {
@@ -112,6 +115,9 @@ func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uu
 	// Check if the user is a member of the workspace
 	memberRole, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, workspaceID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrForbidden
+		}
 		return nil, err
 	}
 

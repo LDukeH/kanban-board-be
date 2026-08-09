@@ -2,13 +2,14 @@ package membership
 
 import (
 	"encoding/json"
-	"fmt"
-	"kanban-board-be/internal/feature/auth"
 	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/auth"
 )
 
 type Handler struct {
@@ -38,8 +39,6 @@ func (h* Handler) CreateMembership(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("WorkspaceID: %s, UserID: %s, Role: %s\n", workspaceID, req.UserID, req.Role)
-
 	if( workspaceID == uuid.Nil || req.UserID == uuid.Nil || req.Role == "" ) {
 		http.Error(w, "WorkspaceID, UserID and Role are required", http.StatusBadRequest)
 		return
@@ -53,7 +52,7 @@ func (h* Handler) CreateMembership(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.membershipService.CreateMembership(r.Context(), workspaceMembership, userID); err != nil {
 		log.Printf("ERROR creating membership: %v\n", err)
-		http.Error(w, "Failed to create membership", http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -106,7 +105,7 @@ func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.membershipService.ChangeMemberRole(r.Context(), workspaceMembership, userID); err != nil {
 		log.Printf("ERROR changing member role: %v\n", err)
-		http.Error(w, "Failed to change member role", http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -143,7 +142,7 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.membershipService.RemoveMember(r.Context(), workspaceMembership, userID); err != nil {
 		log.Printf("ERROR removing member: %v\n", err)
-		http.Error(w, "Failed to remove member", http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
@@ -169,7 +168,7 @@ func (h *Handler) GetMembershipsByWorkspaceID(w http.ResponseWriter, r *http.Req
 	memberships, err := h.membershipService.GetMemberListByWorkspaceID(r.Context(), workspaceID, userID)
 	if err != nil {
 		log.Printf("ERROR getting memberships: %v\n", err)
-		http.Error(w, "Failed to get memberships", http.StatusInternalServerError)
+		apperrors.WriteError(w, err)
 		return
 	}
 
