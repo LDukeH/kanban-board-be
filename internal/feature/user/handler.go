@@ -38,3 +38,17 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(res)
 }
+
+func (h *Handler) SearchUsersByEmail(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+
+	users, err := h.service.SearchUsersByEmail(r.Context(), email)
+	if err != nil {
+		log.Printf("ERROR fetching user: %v\n", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
+}

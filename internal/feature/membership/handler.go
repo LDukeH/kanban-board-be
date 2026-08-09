@@ -10,15 +10,18 @@ import (
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/user"
 )
 
 type Handler struct {
 	membershipService *Service
+	userService *user.Service
 }
 
-func NewHandler(membershipService *Service) *Handler {
+func NewHandler(membershipService *Service, userService *user.Service) *Handler {
 	return &Handler{
 		membershipService: membershipService,
+		userService: userService,
 	}
 }
 
@@ -39,14 +42,21 @@ func (h* Handler) CreateMembership(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if( workspaceID == uuid.Nil || req.UserID == uuid.Nil || req.Role == "" ) {
-		http.Error(w, "WorkspaceID, UserID and Role are required", http.StatusBadRequest)
+	if( workspaceID == uuid.Nil || req.Email == "" || req.Role == "" ) {
+		http.Error(w, "WorkspaceID, Email and Role are required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userService.GetUserByEmail(r.Context(), req.Email)
+	if err != nil {
+		log.Printf("ERROR finding user: %v\n", err)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
 	workspaceMembership := &WorkspaceMembership{
 		WorkspaceID: workspaceID,
-		UserID:      req.UserID,
+		UserID:      user.ID,
 		Role:        req.Role,
 	}
 

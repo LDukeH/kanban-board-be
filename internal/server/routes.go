@@ -35,6 +35,7 @@ func (s *Server) MountHandlers() {
 
 		// Users
 		r.Get("/users/{id}", s.userHandler.GetUserByID)
+		r.Get("/users/search", s.userHandler.SearchUsersByEmail)
 
 		// Workspaces
 		r.Route("/workspaces", func(r chi.Router) {

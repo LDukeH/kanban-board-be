@@ -106,3 +106,43 @@ query := `
 	return user, nil
 
 }
+
+func (r *Repository) SearchByEmail(ctx context.Context, query string) ([]*UserResponse, error) {
+	search := "%" + query + "%"
+	searchQuery:=`
+	SELECT
+		id,
+		email
+	FROM users
+	WHERE email ILIKE $1
+	ORDER BY email
+	LIMIT 10
+	`
+
+	rows, err := r.pool.Query(ctx, searchQuery, search)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	defer rows.Close()
+
+	users := []*UserResponse{}
+
+	for rows.Next() {
+		user := &UserResponse{}
+		err := rows.Scan(
+			&user.ID,
+			&user.Email,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over user rows: %w", err)
+	}
+
+	return users, nil
+}

@@ -16,7 +16,7 @@ type membershipRepository interface {
 	RemoveMember(ctx context.Context, workspaceMembership *WorkspaceMembership) error
 	GetByUserAndWorkspaceID(ctx context.Context, userID uuid.UUID, workspaceID uuid.UUID) (*WorkspaceMembership, error)
 	GetByID(ctx context.Context, membershipID uuid.UUID) (*WorkspaceMembership, error)
-	GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID) ([]*WorkspaceMembership, error)
+	GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID) ([]*WorkspaceMemberResponse, error)
 }
 
 type Service struct {
@@ -111,7 +111,7 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceMembership *Workspa
 	return s.membershipRepo.RemoveMember(ctx, workspaceMembership)
 }
 
-func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) ([]*WorkspaceMembership, error) {
+func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) ([]*WorkspaceMemberResponse	, error) {
 	// Check if the user is a member of the workspace
 	memberRole, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, workspaceID)
 	if err != nil {

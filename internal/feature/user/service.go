@@ -14,6 +14,7 @@ type userRepository interface {
 	Create(ctx context.Context, user *User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
+	SearchByEmail(ctx context.Context, email string) ([]*UserResponse, error)
 }
 
 type Service struct {
@@ -43,4 +44,8 @@ func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {
 
 func (s *Service) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	return s.repo.GetByEmail(ctx, email)
+}
+
+func (s *Service) SearchUsersByEmail(ctx context.Context, email string) ([]*UserResponse, error) {
+	return s.repo.SearchByEmail(ctx, email)
 }

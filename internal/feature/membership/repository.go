@@ -138,8 +138,6 @@ func (r *Repository) GetByUserAndWorkspaceID(
     &membership.CreatedAt,   
     &membership.UpdatedAt,  
 )
-	fmt.Println("userId:", userID)
-	fmt.Println("workspaceId:", workspaceID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace membership by user and workspace ID: %w", err)
@@ -151,18 +149,19 @@ func (r *Repository) GetByUserAndWorkspaceID(
 func (r *Repository) GetMemberListByWorkspaceID(
 	ctx context.Context,
 	workspaceID uuid.UUID,
-) ([]*WorkspaceMembership, error) {
+) ([]*WorkspaceMemberResponse, error) {
+	// Get all memberships, and user information of users for the given workspace ID
 	query := `
-		SELECT 
-			id,
-			workspace_id,
-			user_id,
-			role,
-			created_at,
-			updated_at
-		FROM workspace_memberships
-		WHERE workspace_id = $1
-	`
+	SELECT 
+		wm.id,
+		wm.workspace_id,
+		wm.user_id,
+		wm.role,
+		u.email
+	FROM workspace_memberships AS wm
+	JOIN users AS u ON wm.user_id = u.id
+	WHERE wm.workspace_id = $1
+`
 
 	rows, err := r.pool.Query(ctx, query, workspaceID)
 	if err != nil {
@@ -171,17 +170,16 @@ func (r *Repository) GetMemberListByWorkspaceID(
 
 	defer rows.Close()
 
-	memberships := []*WorkspaceMembership{}
+	memberships := []*WorkspaceMemberResponse{}
 
 	for rows.Next() {
-		membership := &WorkspaceMembership{}
+		membership := &WorkspaceMemberResponse{}
 		err := rows.Scan(
 			&membership.ID,
 			&membership.WorkspaceID,
 			&membership.UserID,
 			&membership.Role,
-			&membership.CreatedAt,
-			&membership.UpdatedAt,
+			&membership.Email,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan workspace membership: %w", err)

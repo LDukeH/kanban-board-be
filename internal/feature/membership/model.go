@@ -24,10 +24,18 @@ type WorkspaceMembership struct {
 }
 
 type MembershipCreateRequest struct {
-	UserID uuid.UUID `json:"user_id"`
+	Email string `json:"email"`
 	Role WorkspaceRole `json:"role"`
 }
 
 type ChangeRoleRequest struct {
 	Role WorkspaceRole `json:"role"`
+}
+
+type WorkspaceMemberResponse struct {
+    ID          uuid.UUID `json:"id"`
+    WorkspaceID uuid.UUID `json:"workspace_id"`
+    UserID      uuid.UUID `json:"user_id"`
+    Role        WorkspaceRole `json:"role"`
+    Email        string    `json:"email"`
 }

@@ -82,7 +82,7 @@ func main() {
 	workspaceHandler := workspace.NewHandler(workspaceService)
 	
 	membershipService := membership.NewService(membershipRepo)
-	membershipHandler := membership.NewHandler(membershipService)
+	membershipHandler := membership.NewHandler(membershipService, userService)
 
 	// Create server
 	s := server.CreateNewServer(
