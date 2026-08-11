@@ -67,55 +67,71 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 
 func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error) {
 	query := `
-	SELECT
-		t.id,
-		t.column_id,
-		t.title,
-		t.description,
-		t.position,
-		t.created_at,
-		t.updated_at,
-		COALESCE(
-			json_agg(
-				json_build_object(
-					'id', l.id,
-					'board_id', l.board_id,
-					'name', l.name,
-					'color', l.color,
-					'created_at', l.created_at,
-					'updated_at', l.updated_at
-				)
-				ORDER BY l.name
-			) FILTER (WHERE l.id IS NOT NULL),
-			'[]'
-		) AS labels
-	FROM tasks t
-	LEFT JOIN task_labels tl
-		ON tl.task_id = t.id
-	LEFT JOIN labels l
-		ON l.id = tl.label_id
-	WHERE t.column_id = $1
-	GROUP BY
-		t.id,
-		t.column_id,
-		t.title,
-		t.description,
-		t.position,
-		t.created_at,
-		t.updated_at
-	ORDER BY t.position ASC
+		SELECT
+			t.id,
+			t.column_id,
+			t.title,
+			t.description,
+			t.position,
+			t.created_at,
+			t.updated_at,
+
+			COALESCE(
+				(
+					SELECT json_agg(
+						json_build_object(
+							'id', l.id,
+							'board_id', l.board_id,
+							'name', l.name,
+							'color', l.color,
+							'created_at', l.created_at,
+							'updated_at', l.updated_at
+						)
+						ORDER BY l.name
+					)
+					FROM task_labels tl
+					JOIN labels l
+						ON l.id = tl.label_id
+					WHERE tl.task_id = t.id
+				),
+				'[]'::json
+			) AS labels,
+
+			COALESCE(
+				(
+					SELECT json_agg(
+						json_build_object(
+							'user_id', u.id,
+							'email', u.email
+						)
+						ORDER BY u.email
+					)
+					FROM task_assignees ta
+					JOIN users u
+						ON u.id = ta.user_id
+					WHERE ta.task_id = t.id
+				),
+				'[]'::json
+			) AS assignees
+
+		FROM tasks t
+		WHERE t.column_id = $1
+		ORDER BY t.position ASC
 	`
+
 	tasks := []*Task{}
+
 	rows, err := r.pool.Query(ctx, query, columnID)
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
 	for rows.Next() {
 		task := &Task{}
+
 		var labelsJSON []byte
+		var assigneesJSON []byte
 
 		err := rows.Scan(
 			&task.ID,
@@ -126,6 +142,7 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			&task.CreatedAt,
 			&task.UpdatedAt,
 			&labelsJSON,
+			&assigneesJSON,
 		)
 		if err != nil {
 			return nil, err
@@ -133,6 +150,10 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 
 		if err := json.Unmarshal(labelsJSON, &task.Labels); err != nil {
 			return nil, fmt.Errorf("error unmarshalling task labels: %w", err)
+		}
+
+		if err := json.Unmarshal(assigneesJSON, &task.Assignees); err != nil {
+			return nil, fmt.Errorf("error unmarshalling task assignees: %w", err)
 		}
 
 		tasks = append(tasks, task)

@@ -16,12 +16,19 @@ type Task struct {
     CreatedAt   time.Time `json:"created_at"`
     UpdatedAt   time.Time `json:"updated_at"`
     
+    // This doesn't exist in the database, but is used to return the labels and assignees associated with the task
     Labels    []label.Label    `json:"labels,omitempty"`
+    Assignees []TaskAssigneeResponse `json:"assignees,omitempty"`
 }
 
 type TaskAssignee struct {
     TaskID uuid.UUID `json:"task_id"`
     UserID uuid.UUID `json:"user_id"`
+}
+
+type TaskAssigneeResponse struct{
+    UserID uuid.UUID `json:"user_id"`
+    Email string `json:"email"`
 }
 
 type TaskLabel struct {
