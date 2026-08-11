@@ -108,7 +108,10 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceMembership *Workspa
 		return apperrors.ErrForbidden
 	}
 
-	return s.membershipRepo.RemoveMember(ctx, workspaceMembership)
+	// Pass the fully-loaded membership (which carries the real UserID) so the
+	// repository can also remove the member's task assignments. The incoming
+	// `workspaceMembership` from the handler only has ID + WorkspaceID.
+	return s.membershipRepo.RemoveMember(ctx, targetMembership)
 }
 
 func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) ([]*WorkspaceMemberResponse	, error) {

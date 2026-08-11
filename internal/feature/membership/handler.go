@@ -144,7 +144,7 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
+	// Target user to be removed
 	workspaceMembership := &WorkspaceMembership{
 		ID: membershipID,
 		WorkspaceID: workspaceID,

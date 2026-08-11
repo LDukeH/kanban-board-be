@@ -2,6 +2,7 @@ package membership
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -212,21 +213,65 @@ func (r *Repository) ChangeMemberRole(
 }
 
 func (r *Repository) RemoveMember(
-	ctx context.Context,
-	workspaceMembership *WorkspaceMembership,
-) error{
-	query := `
-		DELETE FROM workspace_memberships
-		WHERE id = $1 AND workspace_id = $2
-	`
-	result, err := r.pool.Exec(ctx, query, workspaceMembership.ID, workspaceMembership.WorkspaceID)
+    ctx context.Context,
+    workspaceMembership *WorkspaceMembership,
+) error {
+    tx, err := r.pool.Begin(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback(ctx)
 
-	if err != nil {
-		return fmt.Errorf("failed to remove member from workspace: %w", err)
-	}
+    deleteMembershipQuery := `
+        DELETE FROM workspace_memberships
+        WHERE id = $1 AND workspace_id = $2
+        RETURNING user_id
+    `
 
-	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no member found with the given ID in the specified workspace")
-	}
-	return nil
+    var userID uuid.UUID
+
+    err = tx.QueryRow(
+        ctx,
+        deleteMembershipQuery,
+        workspaceMembership.ID,
+        workspaceMembership.WorkspaceID,
+    ).Scan(&userID)
+
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            return fmt.Errorf(
+                "no member found with the given ID in the specified workspace",
+            )
+        }
+
+        return fmt.Errorf("failed to remove member from workspace: %w", err)
+    }
+
+    deleteAssignmentsQuery := `
+        DELETE FROM task_assignees
+        WHERE user_id = $1
+          AND task_id IN (
+              SELECT t.id
+              FROM tasks t
+              JOIN columns c ON c.id = t.column_id
+              JOIN boards b ON b.id = c.board_id
+              WHERE b.workspace_id = $2
+          )
+    `
+
+    _, err = tx.Exec(
+        ctx,
+        deleteAssignmentsQuery,
+        userID,
+        workspaceMembership.WorkspaceID,
+    )
+    if err != nil {
+        return fmt.Errorf("failed to remove task assignments: %w", err)
+    }
+
+    if err := tx.Commit(ctx); err != nil {
+        return fmt.Errorf("failed to commit member removal: %w", err)
+    }
+
+    return nil
 }
