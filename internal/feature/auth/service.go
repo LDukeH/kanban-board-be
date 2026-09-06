@@ -58,6 +58,15 @@ func (s *Service) LookupUser(ctx context.Context) (*user.User, error) {
 	return s.userService.GetUserByID(ctx, userID.String())
 }
 
+func (s *Service) DeleteMyAccount(ctx context.Context) error {
+	userID, err := GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	return s.userService.DeleteUserByID(ctx, userID.String())
+}
+
 func (s *Service) LoginUser(ctx context.Context, email, plainPassword string) (string, error) {
 	user, err := s.userService.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -84,7 +93,7 @@ func (s *Service) LoginUser(ctx context.Context, email, plainPassword string) (s
 
 
 func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12) // 12 is the cost factor
 	if err != nil {
 		return "", err
 	}

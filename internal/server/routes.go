@@ -27,6 +27,7 @@ func (s *Server) MountHandlers() {
 
 		r.Post("/auth/logout", s.authHandler.LogoutHandler)
 		r.Get("/auth/me", s.authHandler.GetMeHandler)
+		r.Delete("/auth/me", s.authHandler.DeleteMyAccountHandler)
 	})
 
 	// Protected API routes

@@ -107,6 +107,27 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) DeleteMyAccountHandler(w http.ResponseWriter, r *http.Request) {
+	if err := h.authService.DeleteMyAccount(r.Context()); err != nil {
+		log.Printf("Failed to delete account: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	// Account is gone: clear the access_token cookie (same as logout)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production (HTTPS)
+		MaxAge:   -1,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.authService.LookupUser(r.Context())
 	if err != nil {

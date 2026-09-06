@@ -15,6 +15,7 @@ type userRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	SearchByEmail(ctx context.Context, email string) ([]*UserResponse, error)
+	DeleteByID(ctx context.Context, id uuid.UUID) error
 }
 
 type Service struct {
@@ -48,4 +49,14 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (*User, erro
 
 func (s *Service) SearchUsersByEmail(ctx context.Context, email string) ([]*UserResponse, error) {
 	return s.repo.SearchByEmail(ctx, email)
+}
+
+func (s *Service) DeleteUserByID(ctx context.Context, id string) error {
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		log.Printf("Invalid UUID format: %v", err)
+		return fmt.Errorf("Invalid UUID format: %w", err)
+	}
+
+	return s.repo.DeleteByID(ctx, userID)
 }

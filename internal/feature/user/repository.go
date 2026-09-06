@@ -146,3 +146,16 @@ func (r *Repository) SearchByEmail(ctx context.Context, query string) ([]*UserRe
 
 	return users, nil
 }
+
+func (r *Repository) DeleteByID(ctx context.Context, id uuid.UUID) error {
+	query := `
+		DELETE FROM users
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	return nil
+}
