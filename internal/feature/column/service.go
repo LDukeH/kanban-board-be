@@ -71,7 +71,7 @@ func (s *Service) GetColumnsByBoardID(ctx context.Context, boardID uuid.UUID, us
 }
 
 func (s *Service) UpdateColumnName(ctx context.Context, userID uuid.UUID, column *Column) error {
-	role, err := s.authz.GetColumnRole(ctx,userID,column.ID)
+	role, err := s.authz.GetColumnRole(ctx, userID, column.ID)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (s *Service) UpdateColumnName(ctx context.Context, userID uuid.UUID, column
 }
 
 func (s *Service) UpdateColumnPosition(ctx context.Context, userID uuid.UUID, column *Column) error {
-	role, err := s.authz.GetColumnRole(ctx,userID,column.ID)
+	role, err := s.authz.GetColumnRole(ctx, userID, column.ID)
 	if err != nil {
 		return err
 	}
@@ -92,12 +92,12 @@ func (s *Service) UpdateColumnPosition(ctx context.Context, userID uuid.UUID, co
 	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
-	
+
 	return s.columnRepo.UpdateColumnPosition(ctx, column.ID, column.Position)
 }
 
 func (s *Service) DeleteColumn(ctx context.Context, userID uuid.UUID, columnID uuid.UUID) error {
-	role, err := s.authz.GetColumnRole(ctx,userID,columnID)
+	role, err := s.authz.GetColumnRole(ctx, userID, columnID)
 	if err != nil {
 		return err
 	}

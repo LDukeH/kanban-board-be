@@ -138,4 +138,3 @@ func (s *Service) GetLabelRole(
 func (s *Service) GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (uuid.UUID, error) {
 	return s.columnProvider.GetColumnBoardID(ctx, columnID)
 }
-

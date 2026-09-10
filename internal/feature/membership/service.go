@@ -36,7 +36,7 @@ func (s *Service) CreateMembership(ctx context.Context, membership *WorkspaceMem
 	if err != nil {
 		return err
 	}
-	
+
 	role := memberRole.Role
 	if role != Owner && role != Admin {
 		return apperrors.ErrForbidden
@@ -46,7 +46,7 @@ func (s *Service) CreateMembership(ctx context.Context, membership *WorkspaceMem
 }
 
 func (s *Service) ChangeMemberRole(ctx context.Context, membership *WorkspaceMembership, userID uuid.UUID) error {
-	// Check if the user is owner 
+	// Check if the user is owner
 	memberRole, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, membership.WorkspaceID)
 	if err != nil {
 		return err
@@ -54,11 +54,11 @@ func (s *Service) ChangeMemberRole(ctx context.Context, membership *WorkspaceMem
 
 	role := memberRole.Role
 
-	if role != Owner{
+	if role != Owner {
 		return apperrors.ErrForbidden
 	}
 
-	targetMembership, err:= s.membershipRepo.GetByID(ctx, membership.ID)
+	targetMembership, err := s.membershipRepo.GetByID(ctx, membership.ID)
 	if err != nil {
 		return err
 	}
@@ -67,11 +67,11 @@ func (s *Service) ChangeMemberRole(ctx context.Context, membership *WorkspaceMem
 		return apperrors.ErrNotFound
 	}
 
-	if(targetMembership.UserID == userID){
+	if targetMembership.UserID == userID {
 		return apperrors.ErrForbidden
 	}
 
-	if(targetMembership.Role == Owner){
+	if targetMembership.Role == Owner {
 		return apperrors.ErrForbidden
 	}
 
@@ -79,7 +79,7 @@ func (s *Service) ChangeMemberRole(ctx context.Context, membership *WorkspaceMem
 }
 
 func (s *Service) RemoveMember(ctx context.Context, workspaceMembership *WorkspaceMembership, userID uuid.UUID) error {
-	// Check if the user is owner 
+	// Check if the user is owner
 	memberRole, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, workspaceMembership.WorkspaceID)
 	if err != nil {
 		return err
@@ -100,11 +100,11 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceMembership *Workspa
 		return apperrors.ErrNotFound
 	}
 
-	if(targetMembership.UserID == userID){
+	if targetMembership.UserID == userID {
 		return apperrors.ErrForbidden
 	}
 
-	if(targetMembership.Role == Owner){
+	if targetMembership.Role == Owner {
 		return apperrors.ErrForbidden
 	}
 
@@ -114,7 +114,7 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceMembership *Workspa
 	return s.membershipRepo.RemoveMember(ctx, targetMembership)
 }
 
-func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) ([]*WorkspaceMemberResponse	, error) {
+func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) ([]*WorkspaceMemberResponse, error) {
 	// Check if the user is a member of the workspace
 	memberRole, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, workspaceID)
 	if err != nil {
@@ -135,4 +135,35 @@ func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uu
 	}
 
 	return memberships, nil
+}
+
+func (s *Service) LeaveWorkspace(ctx context.Context, workspaceMembership *WorkspaceMembership, userID uuid.UUID) error {
+	// Check if the user is a member of the workspace
+	membership, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, workspaceMembership.WorkspaceID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.ErrForbidden
+		}
+		return err
+	}
+
+	role := membership.Role
+	if role != Owner && role != Admin && role != Member {
+		return apperrors.ErrForbidden
+	}
+
+	if membership.WorkspaceID != workspaceMembership.WorkspaceID {
+		return apperrors.ErrNotFound
+	}
+
+	if membership.UserID != userID {
+		return apperrors.ErrForbidden
+	}
+
+	// Prevent the last owner from leaving the workspace
+	if membership.Role == Owner {
+		return apperrors.ErrForbidden
+	}
+
+	return s.membershipRepo.RemoveMember(ctx, membership)
 }

@@ -2,12 +2,10 @@ package user
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
-
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"fmt"
 )
 
 type Repository struct {
@@ -21,16 +19,15 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, user *User) error {
-	query:= 
-	`INSERT INTO users (
+	query :=
+		`INSERT INTO users (
 			email,
 			password_hash
 		)
 	VALUES ($1, $2)
 	RETURNING id, created_at, updated_at`
 
-
-	return r.pool.QueryRow(ctx,query,user.Email,user.PasswordHash).Scan(&user.ID,&user.CreatedAt,&user.UpdatedAt);
+	return r.pool.QueryRow(ctx, query, user.Email, user.PasswordHash).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
 func (r *Repository) GetByID(
@@ -74,7 +71,7 @@ func (r *Repository) GetByEmail(
 	ctx context.Context,
 	email string,
 ) (*User, error) {
-query := `
+	query := `
 		SELECT
 			id,
 			email,
@@ -109,7 +106,7 @@ query := `
 
 func (r *Repository) SearchByEmail(ctx context.Context, query string) ([]*UserResponse, error) {
 	search := "%" + query + "%"
-	searchQuery:=`
+	searchQuery := `
 	SELECT
 		id,
 		email

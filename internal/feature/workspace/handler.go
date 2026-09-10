@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -41,10 +42,8 @@ func (h *Handler) GetAllWorkspaces(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetWorkspaceByID(w http.ResponseWriter, r *http.Request) {
-	// Extract the workspace ID from the URL path
 	id := chi.URLParam(r, "workspaceID")
 
-	// Check if the ID is a valid UUID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -140,7 +139,6 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
-	// Extract the workspace ID from the URL path
 	workspaceIDStr := chi.URLParam(r, "workspaceID")
 	workspaceID, err := uuid.Parse(workspaceIDStr)
 	if err != nil {
@@ -160,6 +158,46 @@ func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 		apperrors.WriteError(w, err)
 		return
 	}
-	
+
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
+	var req TransferOwnershipRequest
+
+	workspaceIDStr := chi.URLParam(r, "workspaceID")
+	workspaceID, err := uuid.Parse(workspaceIDStr)
+	if err != nil {
+		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := auth.GetUserID(r)
+	if err != nil {
+		log.Println("ERROR: userID not found in context")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	fmt.Println("Owner id:", userID);
+	fmt.Println("Transfer user id:", req.NewOwnerID)
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("ERROR decoding request body: %v\n", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.NewOwnerID == uuid.Nil {
+		http.Error(w, "New owner ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.TransferOwnership(r.Context(), workspaceID, userID, req.NewOwnerID); err != nil {
+		log.Printf("ERROR transferring ownership: %v\n", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+

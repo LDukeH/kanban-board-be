@@ -35,31 +35,33 @@ func (s *Server) MountHandlers() {
 		r.Use(s.authService.AuthMiddleware)
 
 		// Users
-		r.Get("/users/{id}", s.userHandler.GetUserByID)
+		r.Get("/users/{userID}", s.userHandler.GetUserByID)
 		r.Get("/users/search", s.userHandler.SearchUsersByEmail)
 
-		// Workspaces
-		r.Route("/workspaces", func(r chi.Router) {
-			r.Post("/", s.workspaceHandler.CreateWorkspace)
-			r.Get("/", s.workspaceHandler.GetAllWorkspaces)
-			r.Get("/{workspaceID}", s.workspaceHandler.GetWorkspaceByID)
-			r.Patch("/{workspaceID}", s.workspaceHandler.UpdateWorkspace)
-			r.Delete("/{workspaceID}", s.workspaceHandler.DeleteWorkspace)
+			// Workspaces
+			r.Route("/workspaces", func(r chi.Router) {
+				r.Post("/", s.workspaceHandler.CreateWorkspace)
+				r.Get("/", s.workspaceHandler.GetAllWorkspaces)
+				r.Get("/{workspaceID}", s.workspaceHandler.GetWorkspaceByID)
+				r.Patch("/{workspaceID}", s.workspaceHandler.UpdateWorkspace)
+				r.Delete("/{workspaceID}", s.workspaceHandler.DeleteWorkspace)
+				r.Post("/{workspaceID}/transfer-ownership", s.workspaceHandler.TransferOwnership)
+				r.Delete("/{workspaceID}/memberships", s.membershipHandler.LeaveWorkspace)
 
-			// Boards inside workspace
-			r.Route("/{workspaceID}/boards", func(r chi.Router) {
-				r.Post("/", s.boardHandler.CreateBoard)
-				r.Get("/", s.boardHandler.GetBoardsByWorkspaceID)
-			})
+				// Boards inside workspace
+				r.Route("/{workspaceID}/boards", func(r chi.Router) {
+					r.Post("/", s.boardHandler.CreateBoard)
+					r.Get("/", s.boardHandler.GetBoardsByWorkspaceID)
+				})
 
-			// Membership inside workspace
-			r.Route("/{workspaceID}/members", func(r chi.Router) {
-				r.Post("/", s.membershipHandler.CreateMembership)
-				r.Get("/", s.membershipHandler.GetMembershipsByWorkspaceID)
-				r.Patch("/{id}", s.membershipHandler.ChangeMemberRole)
-				r.Delete("/{id}", s.membershipHandler.RemoveMember)
+				// Membership inside workspace
+				r.Route("/{workspaceID}/members", func(r chi.Router) {
+					r.Post("/", s.membershipHandler.CreateMembership)
+					r.Get("/", s.membershipHandler.GetMembershipsByWorkspaceID)
+					r.Patch("/{membershipID}", s.membershipHandler.ChangeMemberRole)
+					r.Delete("/{membershipID}", s.membershipHandler.RemoveMember)
+				})
 			})
-		})
 
 		// Boards
 		r.Route("/boards", func(r chi.Router) {
@@ -102,23 +104,23 @@ func (s *Server) MountHandlers() {
 
 		// Tasks
 		r.Route("/tasks", func(r chi.Router) {
-		r.Patch("/{taskID}", s.taskHandler.UpdateTask)
-		r.Patch("/{taskID}/position", s.taskHandler.UpdateTaskPosition)
-		r.Delete("/{taskID}", s.taskHandler.DeleteTask)
+			r.Patch("/{taskID}", s.taskHandler.UpdateTask)
+			r.Patch("/{taskID}/position", s.taskHandler.UpdateTaskPosition)
+			r.Delete("/{taskID}", s.taskHandler.DeleteTask)
 
-		// Labels attached to task
-		r.Route("/{taskID}/labels", func(r chi.Router) {
-			r.Get("/", s.taskHandler.GetLabelsByTaskID)
-			r.Post("/", s.taskHandler.AddLabelToTask)
-			r.Delete("/{labelID}", s.taskHandler.RemoveLabelFromTask)
-		})
+			// Labels attached to task
+			r.Route("/{taskID}/labels", func(r chi.Router) {
+				r.Get("/", s.taskHandler.GetLabelsByTaskID)
+				r.Post("/", s.taskHandler.AddLabelToTask)
+				r.Delete("/{labelID}", s.taskHandler.RemoveLabelFromTask)
+			})
 
-		// Users assigned to task
-		r.Route("/{taskID}/users", func(r chi.Router) {
-			r.Get("/", s.taskHandler.GetUsersByTaskID)
-			r.Post("/", s.taskHandler.AssignUserToTask)
-			r.Delete("/", s.taskHandler.RemoveUserFromTask)
+			// Users assigned to task
+			r.Route("/{taskID}/users", func(r chi.Router) {
+				r.Get("/", s.taskHandler.GetUsersByTaskID)
+				r.Post("/", s.taskHandler.AssignUserToTask)
+				r.Delete("/", s.taskHandler.RemoveUserFromTask)
+			})
 		})
-	})
 	})
 }

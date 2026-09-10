@@ -1,16 +1,16 @@
 package workspace
 
 import (
+	"time"
+
 	"kanban-board-be/internal/feature/membership"
 
 	"github.com/google/uuid"
-
-	"time"
 )
 
 type Workspace struct {
-	ID  uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -18,11 +18,11 @@ type Workspace struct {
 }
 
 type WorkspaceSummary struct {
-    ID        uuid.UUID               `json:"id"`
-    Name      string                  `json:"name"`
-    Role      membership.WorkspaceRole `json:"role"`
-    CreatedAt time.Time               `json:"created_at"`
-    UpdatedAt time.Time               `json:"updated_at"`
+	ID        uuid.UUID                `json:"id"`
+	Name      string                   `json:"name"`
+	Role      membership.WorkspaceRole `json:"role"`
+	CreatedAt time.Time                `json:"created_at"`
+	UpdatedAt time.Time                `json:"updated_at"`
 }
 
 type WorkspaceCreateRequest struct {
@@ -31,4 +31,8 @@ type WorkspaceCreateRequest struct {
 
 type WorkspaceUpdateRequest struct {
 	Name string `json:"name"`
+}
+
+type TransferOwnershipRequest struct {
+	NewOwnerID uuid.UUID `json:"new_owner_id"`
 }

@@ -21,8 +21,7 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request) {
-	// Extract the user ID from the URL path
-	id := chi.URLParam(r, "id")
+	id := chi.URLParam(r, "userID")
 
 	user, err := h.service.GetUserByID(r.Context(), id)
 	if err != nil {

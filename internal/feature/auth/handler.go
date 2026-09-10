@@ -9,8 +9,6 @@ import (
 	"kanban-board-be/internal/feature/user"
 )
 
-// handler struct
-
 type Handler struct {
 	authService *Service
 }
@@ -35,7 +33,7 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if(req	.Password==""){
+	if req.Password == "" {
 		http.Error(w, "Password is required", http.StatusBadRequest)
 		return
 	}
@@ -59,9 +57,8 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Println("ERROR decoding request body:", err)
 		http.Error(w, "invalid request", http.StatusBadRequest)
-        return
+		return
 	}
-
 
 	if req.Email == "" {
 		http.Error(w, "Email is required", http.StatusBadRequest)
@@ -81,13 +78,13 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-    Name:     "access_token",
-    Value:    token, // Your JWT string
-    Path:     "/",
-    HttpOnly: true,
-    Secure:   false,               // Set to true in production (HTTPS)
-    SameSite: http.SameSiteLaxMode,
-})
+		Name:     "access_token",
+		Value:    token, // Your JWT string
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production (HTTPS)
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -128,7 +125,7 @@ func (h *Handler) DeleteMyAccountHandler(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h* Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.authService.LookupUser(r.Context())
 	if err != nil {
 		log.Printf("Failed to get user: %v", err)

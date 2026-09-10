@@ -91,7 +91,6 @@ func (s *Service) LoginUser(ctx context.Context, email, plainPassword string) (s
 	return token, nil
 }
 
-
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12) // 12 is the cost factor
 	if err != nil {
@@ -102,10 +101,10 @@ func HashPassword(password string) (string, error) {
 }
 
 func GenerateToken(userID string, secretKey string) (string, error) {
-	claims:= jwt.MapClaims{
+	claims := jwt.MapClaims{
 		"user_id": userID,
 		"exp":     jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Token expires in 24 hours
-		"iat":     jwt.NewNumericDate(time.Now()), // Issued at
+		"iat":     jwt.NewNumericDate(time.Now()),                     // Issued at
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

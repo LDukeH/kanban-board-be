@@ -21,7 +21,7 @@ type labelRepository interface {
 }
 
 type Service struct {
-	repo labelRepository
+	repo  labelRepository
 	authz *authz.Service
 }
 
@@ -49,7 +49,7 @@ func (s *Service) GetLabelsByBoardID(ctx context.Context, userID uuid.UUID, boar
 	if err != nil {
 		return nil, err
 	}
-	if( role != membership.Owner && role != membership.Admin && role != membership.Member) {
+	if role != membership.Owner && role != membership.Admin && role != membership.Member {
 		return nil, apperrors.ErrForbidden
 	}
 	return s.repo.GetLabelsByBoardID(ctx, boardID)
@@ -72,7 +72,7 @@ func (s *Service) UpdateLabel(ctx context.Context, userID uuid.UUID, label *Labe
 	if err != nil {
 		return err
 	}
-	if( role != membership.Owner && role != membership.Admin) {
+	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
 	return s.repo.UpdateLabel(ctx, label)
@@ -83,7 +83,7 @@ func (s *Service) DeleteLabel(ctx context.Context, userID uuid.UUID, labelID uui
 	if err != nil {
 		return err
 	}
-	if( role != membership.Owner && role != membership.Admin) {
+	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
 	return s.repo.DeleteLabel(ctx, labelID)
@@ -103,10 +103,10 @@ func (s *Service) AddLabelToTask(ctx context.Context, userID uuid.UUID, taskID u
 
 func (s *Service) RemoveLabelFromTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID, labelID uuid.UUID) error {
 	role, err := s.authz.GetLabelRole(ctx, userID, labelID)
-	if(err != nil) {
+	if err != nil {
 		return err
 	}
-	if(role != membership.Owner && role != membership.Admin && role != membership.Member) {
+	if role != membership.Owner && role != membership.Admin && role != membership.Member {
 		return apperrors.ErrForbidden
 	}
 

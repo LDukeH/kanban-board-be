@@ -25,7 +25,6 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 	var req ColumnCreateRequest
 
-	// Get board ID from URL
 	boardIDStr := chi.URLParam(r, "boardID")
 	boardID, err := uuid.Parse(boardIDStr)
 	if err != nil {
@@ -33,14 +32,12 @@ func (h *Handler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Decode request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid column data", http.StatusBadRequest)
 		return
@@ -68,7 +65,6 @@ func (h *Handler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetColumnsByBoardID(w http.ResponseWriter, r *http.Request) {
-	// Get board ID from URL
 	boardIDStr := chi.URLParam(r, "boardID")
 	boardID, err := uuid.Parse(boardIDStr)
 	if err != nil {
@@ -76,7 +72,6 @@ func (h *Handler) GetColumnsByBoardID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -103,8 +98,8 @@ func (h *Handler) UpdateColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	columnIDstr := chi.URLParam(r, "columnID")
-	columnID, err := uuid.Parse(columnIDstr)
+	columnIDStr := chi.URLParam(r, "columnID")
+	columnID, err := uuid.Parse(columnIDStr)
 
 	if err != nil {
 		http.Error(w, "Invalid column ID", http.StatusBadRequest)
@@ -122,8 +117,8 @@ func (h *Handler) UpdateColumn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	column := Column{
-		ID:       columnID,
-		Name:     req.Name,
+		ID:   columnID,
+		Name: req.Name,
 	}
 
 	if err := h.service.UpdateColumnName(r.Context(), userID, &column); err != nil {
@@ -144,8 +139,8 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	columnIDstr := chi.URLParam(r, "columnID")
-	columnID, err := uuid.Parse(columnIDstr)
+	columnIDStr := chi.URLParam(r, "columnID")
+	columnID, err := uuid.Parse(columnIDStr)
 	if err != nil {
 		http.Error(w, "Invalid column ID", http.StatusBadRequest)
 		return
@@ -156,7 +151,7 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	column:= Column{
+	column := Column{
 		ID:       columnID,
 		Position: req.Position,
 	}
@@ -177,8 +172,8 @@ func (h *Handler) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	columnIDstr := chi.URLParam(r, "columnID")
-	columnID, err := uuid.Parse(columnIDstr)
+	columnIDStr := chi.URLParam(r, "columnID")
+	columnID, err := uuid.Parse(columnIDStr)
 	if err != nil {
 		http.Error(w, "Invalid column ID", http.StatusBadRequest)
 		return

@@ -2,36 +2,35 @@ package task
 
 import (
 	"encoding/json"
-	"kanban-board-be/internal/apperrors"
-	"kanban-board-be/internal/feature/auth"
-	"kanban-board-be/internal/feature/user"
 	"log"
 	"net/http"
 
+	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/auth"
+	"kanban-board-be/internal/feature/label"
+	"kanban-board-be/internal/feature/user"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-
-	"kanban-board-be/internal/feature/label"
 )
 
 type Handler struct {
-	taskService *Service
+	taskService  *Service
 	labelService *label.Service
-	userService *user.Service
+	userService  *user.Service
 }
 
 func NewHandler(service *Service, labelService *label.Service, userService *user.Service) *Handler {
 	return &Handler{
-		taskService: service,
+		taskService:  service,
 		labelService: labelService,
-		userService: userService,
+		userService:  userService,
 	}
 }
 
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var req TaskCreateRequest
 
-	// Get column ID from URL
 	columnIDStr := chi.URLParam(r, "columnID")
 	columnID, err := uuid.Parse(columnIDStr)
 	if err != nil {
@@ -39,14 +38,12 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Decode request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid task data", http.StatusBadRequest)
 		return
@@ -85,13 +82,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
-	
+
 	if err != nil {
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
-	// Decode request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid task data", http.StatusBadRequest)
 		return
@@ -138,7 +134,6 @@ func (h *Handler) UpdateTaskPosition(w http.ResponseWriter, r *http.Request) {
 		ColumnID: req.ColumnID,
 		Position: req.Position,
 	}
-
 
 	if err := h.taskService.UpdateTaskPosition(r.Context(), userID, &task); err != nil {
 		log.Printf("ERROR: Failed to update task position: %v", err)
@@ -234,7 +229,6 @@ func (h *Handler) AddLabelToTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get task ID from URL
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
@@ -263,7 +257,6 @@ func (h *Handler) RemoveLabelFromTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get task ID from URL
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
@@ -271,7 +264,6 @@ func (h *Handler) RemoveLabelFromTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get label ID from URL
 	labelIDStr := chi.URLParam(r, "labelID")
 	labelID, err := uuid.Parse(labelIDStr)
 	if err != nil {
@@ -297,7 +289,6 @@ func (h *Handler) AssignUserToTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get task ID from URL
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
@@ -316,7 +307,7 @@ func (h *Handler) AssignUserToTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.taskService.AssignUserToTask(r.Context(),  taskID, userID, req.UserID); err != nil {
+	if err := h.taskService.AssignUserToTask(r.Context(), taskID, userID, req.UserID); err != nil {
 		log.Printf("ERROR: Failed to assign user to task: %v", err)
 		apperrors.WriteError(w, err)
 		return
@@ -334,7 +325,6 @@ func (h *Handler) RemoveUserFromTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get task ID from URL
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 
@@ -370,7 +360,6 @@ func (h *Handler) GetUsersByTaskID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get task ID from URL
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {

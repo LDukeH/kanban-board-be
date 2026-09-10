@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -32,7 +31,7 @@ func (r *Repository) Create(ctx context.Context, task *Task) error {
 		VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) + 1 FROM tasks WHERE column_id = $1), 0))
 		RETURNING id, created_at, updated_at`
 
-		return r.pool.QueryRow(ctx, query, task.ColumnID, task.Title, task.Description).Scan(&task.ID, &task.CreatedAt, &task.UpdatedAt)
+	return r.pool.QueryRow(ctx, query, task.ColumnID, task.Title, task.Description).Scan(&task.ID, &task.CreatedAt, &task.UpdatedAt)
 }
 
 func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, error) {
@@ -169,18 +168,18 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 	var setClauses []string
 	var args []interface{}
-	
-	if( task.Title != nil ) {
+
+	if task.Title != nil {
 		setClauses = append(setClauses, "title = $1")
 		args = append(args, *task.Title)
 	}
 
-	if( task.Description != nil ) {
+	if task.Description != nil {
 		setClauses = append(setClauses, "description = $2")
 		args = append(args, *task.Description)
 	}
 
-	if(len(setClauses) == 0) {
+	if len(setClauses) == 0 {
 		return nil // Nothing to update
 	}
 
@@ -195,7 +194,7 @@ func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 		strings.Join(setClauses, ", "),
 		len(args), // The position of the task ID in the args slice
 	)
-	
+
 	result, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update task: %w", err)

@@ -7,22 +7,22 @@ import (
 )
 
 type Column struct {
-    ID        uuid.UUID `json:"id"`
-    BoardID   uuid.UUID `json:"board_id"`
-    Name      string    `json:"name"`
-    Position  int       `json:"position"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
+	ID        uuid.UUID `json:"id"`
+	BoardID   uuid.UUID `json:"board_id"`
+	Name      string    `json:"name"`
+	Position  int       `json:"position"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type ColumnCreateRequest struct {
-    Name     string `json:"name"`
+	Name string `json:"name"`
 }
 
 type ColumnUpdateRequest struct {
-    Name     string `json:"name"`
+	Name string `json:"name"`
 }
 
 type ColumnPositionUpdateRequest struct {
-    Position int `json:"position"`
+	Position int `json:"position"`
 }

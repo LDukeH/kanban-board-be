@@ -25,13 +25,13 @@ type taskRepository interface {
 
 type Service struct {
 	taskRepo taskRepository
-	authz     *authz.Service
+	authz    *authz.Service
 }
 
 func NewService(taskRepo taskRepository, authz *authz.Service) *Service {
 	return &Service{
 		taskRepo: taskRepo,
-		authz:      authz,
+		authz:    authz,
 	}
 }
 
@@ -106,7 +106,7 @@ func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.
 		return err
 	}
 
-	if role != membership.Owner && role != membership.Admin{
+	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
 
@@ -149,7 +149,7 @@ func (s *Service) AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID
 func (s *Service) RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, removedUserID uuid.UUID) error {
 	role, err := s.authz.GetTaskRole(ctx, userID, taskID)
 
-	if(err != nil) {
+	if err != nil {
 		return err
 	}
 
@@ -163,7 +163,7 @@ func (s *Service) RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, user
 	if err != nil {
 		return err
 	}
-	if( !isAssigned) {
+	if !isAssigned {
 		fmt.Println("User is not assigned to this task")
 		return apperrors.ErrNotFound
 	}

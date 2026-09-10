@@ -1,11 +1,9 @@
 package auth
 
 import (
-	"net/http"
-
-	"log"
-
 	"context"
+	"log"
+	"net/http"
 )
 
 func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
@@ -16,9 +14,9 @@ func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			if err == http.ErrNoCookie {
 				http.Error(w, "Missing access token", http.StatusUnauthorized)
-			} else{
-				 log.Printf("failed to read access token cookie: %v", err)
-				http.Error(w,"Invalid request", http.StatusBadRequest)
+			} else {
+				log.Printf("failed to read access token cookie: %v", err)
+				http.Error(w, "Invalid request", http.StatusBadRequest)
 			}
 			return
 		}

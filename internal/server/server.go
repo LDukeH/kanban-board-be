@@ -13,7 +13,7 @@ import (
 	"kanban-board-be/internal/feature/workspace"
 )
 
-type Server struct{
+type Server struct {
 	Router *chi.Mux
 	//add other information like db here
 
@@ -49,8 +49,8 @@ type Server struct{
 }
 
 func CreateNewServer(
-	userHandler *user.Handler, 
-	authHandler *auth.Handler, 
+	userHandler *user.Handler,
+	authHandler *auth.Handler,
 	authService *auth.Service,
 	workspaceHandler *workspace.Handler,
 	workspaceService *workspace.Service,
@@ -64,23 +64,23 @@ func CreateNewServer(
 	taskService *task.Service,
 	labelHandler *label.Handler,
 	labelService *label.Service,
-) *Server{
+) *Server {
 	s := &Server{
-		userHandler: userHandler,
-		authHandler: authHandler,
-		authService: authService,
-		workspaceHandler: workspaceHandler,
-		workspaceService: workspaceService,
+		userHandler:       userHandler,
+		authHandler:       authHandler,
+		authService:       authService,
+		workspaceHandler:  workspaceHandler,
+		workspaceService:  workspaceService,
 		membershipHandler: membershipHandler,
 		membershipService: membershipService,
-		boardHandler: boardHandler,
-		boardService: boardService,
-		columnHandler: columnHandler,
-		columnService: columnService,
-		taskHandler: taskHandler,
-		taskService: taskService,
-		labelHandler: labelHandler,
-		labelService: labelService,
+		boardHandler:      boardHandler,
+		boardService:      boardService,
+		columnHandler:     columnHandler,
+		columnService:     columnService,
+		taskHandler:       taskHandler,
+		taskService:       taskService,
+		labelHandler:      labelHandler,
+		labelService:      labelService,
 	}
 	s.Router = chi.NewRouter()
 	return s

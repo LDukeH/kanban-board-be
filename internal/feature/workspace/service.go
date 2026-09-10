@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"kanban-board-be/internal/feature/authz"
@@ -9,8 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-
-	"fmt"
 )
 
 type workspaceRepository interface {
@@ -25,6 +24,7 @@ type workspaceRepository interface {
 
 type membershipRepository interface {
 	CreateTx(ctx context.Context, tx pgx.Tx, membership *membership.WorkspaceMembership) error
+	TransferOwnership(	ctx context.Context, oldOwnerID, newOwnerID, workspaceID uuid.UUID) error
 }
 
 type Service struct {
@@ -96,7 +96,7 @@ func (s *Service) GetWorkspaceByID(ctx context.Context, id string, userID uuid.U
 	return workspace, nil
 }
 
-func (s *Service) UpdateWorkspace(ctx context.Context,workspace Workspace, userID uuid.UUID) error {
+func (s *Service) UpdateWorkspace(ctx context.Context, workspace Workspace, userID uuid.UUID) error {
 	// Check that the user is a owner of the workspace.
 	role, err := s.authz.GetWorkspaceRole(ctx, userID, workspace.ID)
 
@@ -113,7 +113,7 @@ func (s *Service) UpdateWorkspace(ctx context.Context,workspace Workspace, userI
 		return fmt.Errorf("failed to update workspace: %w", err)
 	}
 
-	return nil	
+	return nil
 }
 
 func (s *Service) DeleteWorkspace(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) error {
@@ -129,6 +129,24 @@ func (s *Service) DeleteWorkspace(ctx context.Context, workspaceID uuid.UUID, us
 	// Delete the workspace
 	if err := s.workspaceRepo.DeleteWorkspace(ctx, workspaceID); err != nil {
 		return fmt.Errorf("failed to delete workspace: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) TransferOwnership(ctx context.Context, workspaceID, oldOwnerID, newOwnerID uuid.UUID) error {
+	// Check that the old owner is indeed the current owner of the workspace.
+	role, err := s.authz.GetWorkspaceRole(ctx, oldOwnerID, workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get workspace role: %w", err)
+	}
+	if role != membership.Owner {
+		return fmt.Errorf("user is not authorized to transfer ownership of this workspace")
+	}
+
+	// Transfer ownership
+	if err := s.membershipRepo.TransferOwnership(ctx, oldOwnerID, newOwnerID, workspaceID); err != nil {
+		return fmt.Errorf("failed to transfer ownership: %w", err)
 	}
 
 	return nil

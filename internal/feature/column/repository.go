@@ -2,11 +2,10 @@ package column
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"fmt"
 )
 
 type Repository struct {
@@ -20,8 +19,8 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, column *Column) error {
-	query := 
-	`INSERT INTO columns (
+	query :=
+		`INSERT INTO columns (
 		board_id,
 		name,
 		position
@@ -32,9 +31,9 @@ func (r *Repository) Create(ctx context.Context, column *Column) error {
 	return r.pool.QueryRow(ctx, query, column.BoardID, column.Name).Scan(&column.ID, &column.CreatedAt, &column.UpdatedAt)
 }
 
-func (r *Repository) GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error) {	
-	query:=
-	`SELECT
+func (r *Repository) GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error) {
+	query :=
+		`SELECT
 		id,
 		board_id,
 		name,
@@ -91,8 +90,8 @@ func (r *Repository) GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (
 }
 
 func (r *Repository) GetByID(ctx context.Context, columnID uuid.UUID) (*Column, error) {
-	query := 
-	`SELECT
+	query :=
+		`SELECT
 		id,
 		board_id,
 		name,
@@ -133,54 +132,54 @@ func (r *Repository) UpdateColumnName(ctx context.Context, column *Column) error
 }
 
 func (r *Repository) UpdateColumnPosition(ctx context.Context, columnID uuid.UUID, newPosition int) error {
-    tx, err := r.pool.Begin(ctx)
-    if err != nil {
-        return fmt.Errorf("failed to begin transaction: %w", err)
-    }
-    defer tx.Rollback(ctx)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-    var boardID uuid.UUID
-    var oldPosition int
+	var boardID uuid.UUID
+	var oldPosition int
 
-    // Lock row inside transaction
-    err = tx.QueryRow(
-        ctx,
-        `SELECT board_id, position FROM columns WHERE id = $1 FOR UPDATE`,
-        columnID,
-    ).Scan(&boardID, &oldPosition)
-    if err != nil {
-        return fmt.Errorf("failed to lock column: %w", err)
-    }
+	// Lock row inside transaction
+	err = tx.QueryRow(
+		ctx,
+		`SELECT board_id, position FROM columns WHERE id = $1 FOR UPDATE`,
+		columnID,
+	).Scan(&boardID, &oldPosition)
+	if err != nil {
+		return fmt.Errorf("failed to lock column: %w", err)
+	}
 
-    if newPosition == oldPosition {
-        return nil
-    }
+	if newPosition == oldPosition {
+		return nil
+	}
 
-    if newPosition > oldPosition {
-        _, err = tx.Exec(ctx, `
+	if newPosition > oldPosition {
+		_, err = tx.Exec(ctx, `
             UPDATE columns
             SET position = position - 1, updated_at = NOW()
             WHERE board_id = $1 AND position > $2 AND position <= $3
         `, boardID, oldPosition, newPosition)
-    } else {
-        _, err = tx.Exec(ctx, `
+	} else {
+		_, err = tx.Exec(ctx, `
             UPDATE columns
             SET position = position + 1, updated_at = NOW()
             WHERE board_id = $1 AND position >= $2 AND position < $3
         `, boardID, newPosition, oldPosition)
-    }
-    if err != nil {
-        return fmt.Errorf("failed to reorder surrounding columns: %w", err)
-    }
+	}
+	if err != nil {
+		return fmt.Errorf("failed to reorder surrounding columns: %w", err)
+	}
 
-    _, err = tx.Exec(ctx, `
+	_, err = tx.Exec(ctx, `
         UPDATE columns SET position = $1, updated_at = NOW() WHERE id = $2
     `, newPosition, columnID)
-    if err != nil {
-        return fmt.Errorf("failed to update moved column: %w", err)
-    }
+	if err != nil {
+		return fmt.Errorf("failed to update moved column: %w", err)
+	}
 
-    return tx.Commit(ctx)
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID) error {

@@ -2,17 +2,14 @@ package workspace
 
 import (
 	"context"
-
-	"github.com/google/uuid"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"fmt"
 
 	"kanban-board-be/internal/feature/membership"
-)
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type Repository struct {
 	pool *pgxpool.Pool
@@ -25,12 +22,12 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) BeginTx(ctx context.Context) (pgx.Tx, error) {
-    return r.pool.Begin(ctx)
+	return r.pool.Begin(ctx)
 }
 
 func (r *Repository) Create(ctx context.Context, workspace *Workspace) error {
-	query:=
-	`INSERT INTO workspaces (
+	query :=
+		`INSERT INTO workspaces (
 			name
 		)
 	VALUES ($1)
@@ -40,11 +37,11 @@ func (r *Repository) Create(ctx context.Context, workspace *Workspace) error {
 }
 
 func (r *Repository) CreateTx(
-    ctx context.Context,
-    tx pgx.Tx,
-    workspace *Workspace,
+	ctx context.Context,
+	tx pgx.Tx,
+	workspace *Workspace,
 ) error {
-   query := `
+	query := `
 		INSERT INTO workspaces (
 			name
 		)
@@ -64,8 +61,8 @@ func (r *Repository) CreateTx(
 }
 
 func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error) {
-	query := 
-	`SELECT
+	query :=
+		`SELECT
 		w.id,
 		w.name,
 		wm.role,
@@ -103,7 +100,6 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*Work
 		return nil, fmt.Errorf("error iterating over workspace rows: %w", err)
 	}
 
-
 	return workspaces, nil
 }
 
@@ -135,11 +131,11 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Workspace, err
 		return nil, fmt.Errorf("failed to get workspace by ID: %w", err)
 	}
 
-	return workspace, nil	
+	return workspace, nil
 }
 
 func (r *Repository) GetList(ctx context.Context) ([]*Workspace, error) {
-	query:=`
+	query := `
 		SELECT
 			id,
 			name,

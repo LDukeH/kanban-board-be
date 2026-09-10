@@ -2,16 +2,9 @@ package main
 
 import (
 	"log"
-
-	"github.com/joho/godotenv"
-
 	"net/http"
-
 	"os"
-
 	"time"
-
-	"kanban-board-be/internal/server"
 
 	"kanban-board-be/internal/db"
 	"kanban-board-be/internal/feature/auth"
@@ -23,6 +16,9 @@ import (
 	"kanban-board-be/internal/feature/task"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
+	"kanban-board-be/internal/server"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -35,7 +31,7 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer pool.Close()
-	
+
 	// User injection
 	userRepo := user.NewRepository(pool)
 	userService := user.NewService(userRepo)
@@ -59,40 +55,39 @@ func main() {
 	authzService := authz.NewService(membershipRepo, boardRepo, columnRepo, taskRepo, labelRepo)
 	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
-	
+
 	// Board
 	boardService := board.NewService(boardRepo, authzService)
 	boardHandler := board.NewHandler(boardService)
 
-	// Column 
+	// Column
 	columnService := column.NewService(boardRepo, columnRepo, authzService)
 	columnHandler := column.NewHandler(columnService)
-
 
 	// Label
 	labelService := label.NewService(labelRepo, authzService)
 	labelHandler := label.NewHandler(labelService)
-	
+
 	// Task
 	taskService := task.NewService(taskRepo, authzService)
 	taskHandler := task.NewHandler(taskService, labelService, userService)
-	
+
 	// Workspace injection
 	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)
 	workspaceHandler := workspace.NewHandler(workspaceService)
-	
+
 	membershipService := membership.NewService(membershipRepo)
 	membershipHandler := membership.NewHandler(membershipService, userService)
 
 	// Create server
 	s := server.CreateNewServer(
-		userHandler, authHandler, authService, 
-		workspaceHandler, workspaceService, 
+		userHandler, authHandler, authService,
+		workspaceHandler, workspaceService,
 		membershipHandler, membershipService,
-		boardHandler, boardService, 
+		boardHandler, boardService,
 		columnHandler, columnService,
 		taskHandler, taskService,
-		labelHandler, labelService,)
+		labelHandler, labelService)
 	s.MountHandlers()
 
 	// Start HTTP server

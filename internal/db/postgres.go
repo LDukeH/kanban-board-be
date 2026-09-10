@@ -8,8 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-
-func NewPostgresPool()(*pgxpool.Pool, error){
+func NewPostgresPool() (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 
 	if err != nil {
@@ -22,6 +21,6 @@ func NewPostgresPool()(*pgxpool.Pool, error){
 		fmt.Print("Can't reach the database")
 		return nil, err
 	}
-	
+
 	return pool, nil
 }

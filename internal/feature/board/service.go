@@ -76,9 +76,9 @@ func (s *Service) UpdateBoard(ctx context.Context, userID uuid.UUID, board *Boar
 	return s.boardRepo.UpdateBoard(ctx, board)
 }
 
-func (s *Service) DeleteBoard(ctx context.Context, userID uuid.UUID, boardID uuid.UUID) error {
+func (s *Service) DeleteBoard(ctx context.Context, boardID uuid.UUID, userID uuid.UUID) error {
 	role, err := s.authz.GetBoardRole(ctx, userID, boardID)
-	
+
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,8 @@ package auth
 import "time"
 
 type Config struct {
-    SecretKey string
-    Expiration time.Duration
+	SecretKey  string
+	Expiration time.Duration
 }
 
 type LoginRequest struct {
@@ -21,7 +21,6 @@ type GetMeResponse struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`
 }
-
 
 type contextKey string
 

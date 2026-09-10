@@ -19,5 +19,5 @@ type User struct {
 
 type UserResponse struct {
 	ID    uuid.UUID `json:"id"`
-	Email string `json:"email"`
+	Email string    `json:"email"`
 }

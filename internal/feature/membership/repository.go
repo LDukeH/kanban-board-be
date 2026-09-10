@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,8 +21,8 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, membership *WorkspaceMembership) error {
-	query:=
-	`INSERT INTO workspace_memberships (
+	query :=
+		`INSERT INTO workspace_memberships (
 			workspace_id,
 			user_id,
 			role
@@ -31,23 +30,23 @@ func (r *Repository) Create(ctx context.Context, membership *WorkspaceMembership
 	VALUES ($1, $2, $3)
 	RETURNING id, created_at, updated_at`
 
-	return r.pool.QueryRow(ctx,query,membership.WorkspaceID,membership.UserID,membership.Role).Scan(&membership.ID,&membership.CreatedAt,&membership.UpdatedAt);
+	return r.pool.QueryRow(ctx, query, membership.WorkspaceID, membership.UserID, membership.Role).Scan(&membership.ID, &membership.CreatedAt, &membership.UpdatedAt)
 }
 
 func (r *Repository) CreateTx(
-    ctx context.Context,
-    tx pgx.Tx,
-    membership *WorkspaceMembership,
+	ctx context.Context,
+	tx pgx.Tx,
+	membership *WorkspaceMembership,
 ) error {
-   query:=
-	`INSERT INTO workspace_memberships (
+	query :=
+		`INSERT INTO workspace_memberships (
 			workspace_id,
 			user_id,
 			role
 		)
 	VALUES ($1, $2, $3)
 	RETURNING id, created_at, updated_at`
-	
+
 	return tx.QueryRow(
 		ctx,
 		query,
@@ -132,13 +131,13 @@ func (r *Repository) GetByUserAndWorkspaceID(
 		userID,
 		workspaceID,
 	).Scan(
-    &membership.ID,          
-    &membership.WorkspaceID, 
-    &membership.UserID,      
-    &membership.Role,       
-    &membership.CreatedAt,   
-    &membership.UpdatedAt,  
-)
+		&membership.ID,
+		&membership.WorkspaceID,
+		&membership.UserID,
+		&membership.Role,
+		&membership.CreatedAt,
+		&membership.UpdatedAt,
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace membership by user and workspace ID: %w", err)
@@ -213,41 +212,41 @@ func (r *Repository) ChangeMemberRole(
 }
 
 func (r *Repository) RemoveMember(
-    ctx context.Context,
-    workspaceMembership *WorkspaceMembership,
+	ctx context.Context,
+	workspaceMembership *WorkspaceMembership,
 ) error {
-    tx, err := r.pool.Begin(ctx)
-    if err != nil {
-        return fmt.Errorf("failed to begin transaction: %w", err)
-    }
-    defer tx.Rollback(ctx)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-    deleteMembershipQuery := `
+	deleteMembershipQuery := `
         DELETE FROM workspace_memberships
         WHERE id = $1 AND workspace_id = $2
         RETURNING user_id
     `
 
-    var userID uuid.UUID
+	var userID uuid.UUID
 
-    err = tx.QueryRow(
-        ctx,
-        deleteMembershipQuery,
-        workspaceMembership.ID,
-        workspaceMembership.WorkspaceID,
-    ).Scan(&userID)
+	err = tx.QueryRow(
+		ctx,
+		deleteMembershipQuery,
+		workspaceMembership.ID,
+		workspaceMembership.WorkspaceID,
+	).Scan(&userID)
 
-    if err != nil {
-        if errors.Is(err, pgx.ErrNoRows) {
-            return fmt.Errorf(
-                "no member found with the given ID in the specified workspace",
-            )
-        }
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf(
+				"no member found with the given ID in the specified workspace",
+			)
+		}
 
-        return fmt.Errorf("failed to remove member from workspace: %w", err)
-    }
+		return fmt.Errorf("failed to remove member from workspace: %w", err)
+	}
 
-    deleteAssignmentsQuery := `
+	deleteAssignmentsQuery := `
         DELETE FROM task_assignees
         WHERE user_id = $1
           AND task_id IN (
@@ -259,19 +258,59 @@ func (r *Repository) RemoveMember(
           )
     `
 
-    _, err = tx.Exec(
-        ctx,
-        deleteAssignmentsQuery,
-        userID,
-        workspaceMembership.WorkspaceID,
-    )
-    if err != nil {
-        return fmt.Errorf("failed to remove task assignments: %w", err)
-    }
+	_, err = tx.Exec(
+		ctx,
+		deleteAssignmentsQuery,
+		userID,
+		workspaceMembership.WorkspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to remove task assignments: %w", err)
+	}
 
-    if err := tx.Commit(ctx); err != nil {
-        return fmt.Errorf("failed to commit member removal: %w", err)
-    }
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit member removal: %w", err)
+	}
 
-    return nil
+	return nil
+}
+
+// TransferOwnership demotes the current owner to a member and promotes the
+// successor. Both updates run in a single transaction so a failure leaves the
+// workspace's ownership unchanged.
+func (r *Repository) TransferOwnership(
+	ctx context.Context,
+	oldOwnerID, newOwnerID, workspaceID uuid.UUID,
+) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	// If we return early without committing, the transaction is rolled back.
+	// After a successful Commit this is a harmless no-op.
+	defer tx.Rollback(ctx)
+
+	query := `
+		UPDATE workspace_memberships
+		SET role = $1, updated_at = NOW()
+		WHERE user_id = $2 AND workspace_id = $3
+	`
+
+	// Demote the old owner first so the partial unique index on
+	// one owner per workspace is free for the new owner.
+	_, err = tx.Exec(ctx, query, "member", oldOwnerID, workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to demote old owner: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, query, "owner", newOwnerID, workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to promote new owner: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit ownership transfer: %w", err)
+	}
+
+	return nil
 }

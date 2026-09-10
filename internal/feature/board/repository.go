@@ -2,13 +2,11 @@ package board
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"fmt"
 )
-
 
 type Repository struct {
 	pool *pgxpool.Pool
@@ -21,8 +19,8 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, board *Board) error {
-	query:=
-	`INSERT INTO boards (
+	query :=
+		`INSERT INTO boards (
 			name,
 			workspace_id
 		)
@@ -33,8 +31,8 @@ func (r *Repository) Create(ctx context.Context, board *Board) error {
 }
 
 func (r *Repository) GetByWorkspaceID(ctx context.Context, workspaceID uuid.UUID) ([]*BoardSummary, error) {
-	query := 
-	`SELECT
+	query :=
+		`SELECT
 		id,
 		name,
 		workspace_id,
@@ -43,9 +41,9 @@ func (r *Repository) GetByWorkspaceID(ctx context.Context, workspaceID uuid.UUID
 	FROM boards
 	WHERE workspace_id = $1
 	ORDER BY created_at ASC
-	`	
+	`
 
-	boards :=[]* BoardSummary{}
+	boards := []*BoardSummary{}
 	rows, err := r.pool.Query(ctx, query, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query boards: %w", err)
@@ -88,8 +86,8 @@ func (r *Repository) GetBoardWorkspaceID(ctx context.Context, boardID uuid.UUID)
 }
 
 func (r *Repository) GetByID(ctx context.Context, boardID uuid.UUID) (*Board, error) {
-	query := 
-	`SELECT 
+	query :=
+		`SELECT 
 		id,
 		name,
 		workspace_id,
@@ -107,7 +105,7 @@ func (r *Repository) GetByID(ctx context.Context, boardID uuid.UUID) (*Board, er
 		&board.CreatedAt,
 		&board.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan board: %w", err)
 	}
@@ -125,7 +123,7 @@ func (r *Repository) UpdateBoard(ctx context.Context, board *Board) error {
 	if err != nil {
 		return fmt.Errorf("failed to update board: %w", err)
 	}
-	return nil;
+	return nil
 }
 
 func (r *Repository) DeleteBoard(ctx context.Context, boardID uuid.UUID) error {
@@ -138,5 +136,5 @@ func (r *Repository) DeleteBoard(ctx context.Context, boardID uuid.UUID) error {
 		return fmt.Errorf("failed to delete board: %w", err)
 	}
 
-	return nil;
+	return nil
 }

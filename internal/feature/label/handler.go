@@ -2,11 +2,12 @@ package label
 
 import (
 	"encoding/json"
-	"kanban-board-be/internal/apperrors"
-	"kanban-board-be/internal/feature/auth"
 	"log"
 	"net/http"
 	"regexp"
+
+	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/auth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -31,7 +32,6 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 	var req LabelCreateRequest
 
-	// Get board ID from URL	
 	boardIDStr := chi.URLParam(r, "boardID")
 	boardID, err := uuid.Parse(boardIDStr)
 	if err != nil {
@@ -39,14 +39,12 @@ func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Decode request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid label data", http.StatusBadRequest)
 		return
@@ -106,7 +104,6 @@ func (h *Handler) GetLabelsByBoardID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetLabelByID(w http.ResponseWriter, r *http.Request) {
-	// Get label ID from URL
 	labelIDStr := chi.URLParam(r, "labelID")
 	labelID, err := uuid.Parse(labelIDStr)
 	if err != nil {
@@ -114,7 +111,6 @@ func (h *Handler) GetLabelByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

@@ -25,7 +25,6 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 	var req BoardCreateRequest
 
-	// Get workspace ID from URL
 	workspaceIDStr := chi.URLParam(r, "workspaceID")
 	workspaceID, err := uuid.Parse(workspaceIDStr)
 	if err != nil {
@@ -33,14 +32,12 @@ func (h *Handler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Decode request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid board data", http.StatusBadRequest)
 		return
@@ -68,7 +65,6 @@ func (h *Handler) CreateBoard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetBoardsByWorkspaceID(w http.ResponseWriter, r *http.Request) {
-	// Get workspace ID from URL
 	workspaceIDStr := chi.URLParam(r, "workspaceID")
 	workspaceID, err := uuid.Parse(workspaceIDStr)
 	if err != nil {
@@ -76,7 +72,6 @@ func (h *Handler) GetBoardsByWorkspaceID(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -95,7 +90,6 @@ func (h *Handler) GetBoardsByWorkspaceID(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) GetBoardByID(w http.ResponseWriter, r *http.Request) {
-	// Get board ID from URL
 	boardIDStr := chi.URLParam(r, "boardID")
 	boardID, err := uuid.Parse(boardIDStr)
 	if err != nil {
@@ -103,7 +97,6 @@ func (h *Handler) GetBoardByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get authenticated user ID
 	userID, err := auth.GetUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -129,7 +122,7 @@ func (h *Handler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	
+
 	boardIDStr := chi.URLParam(r, "boardID")
 	boardID, err := uuid.Parse(boardIDStr)
 
@@ -165,7 +158,6 @@ func (h *Handler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
-	// Get board ID from URL
 	boardIDStr := chi.URLParam(r, "boardID")
 
 	boardID, err := uuid.Parse(boardIDStr)
@@ -189,4 +181,3 @@ func (h *Handler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-	
