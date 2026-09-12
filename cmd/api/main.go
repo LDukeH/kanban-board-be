@@ -13,6 +13,7 @@ import (
 	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
+	"kanban-board-be/internal/feature/notification"
 	"kanban-board-be/internal/feature/task"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
@@ -51,10 +52,15 @@ func main() {
 	columnRepo := column.NewRepository(pool)
 	taskRepo := task.NewRepository(pool)
 	labelRepo := label.NewRepository(pool)
+	notificationRepo := notification.NewRepository(pool)
 	// Authorization injection
 	authzService := authz.NewService(membershipRepo, boardRepo, columnRepo, taskRepo, labelRepo)
 	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
+
+	// Notification
+	notificationService := notification.NewService(notificationRepo)
+	notificationHandler := notification.NewHandler(notificationService)
 
 	// Board
 	boardService := board.NewService(boardRepo, authzService)
@@ -69,14 +75,14 @@ func main() {
 	labelHandler := label.NewHandler(labelService)
 
 	// Task
-	taskService := task.NewService(taskRepo, authzService)
+	taskService := task.NewService(taskRepo, authzService, notificationService, userService)
 	taskHandler := task.NewHandler(taskService, labelService, userService)
 
 	// Workspace injection
 	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)
 	workspaceHandler := workspace.NewHandler(workspaceService)
 
-	membershipService := membership.NewService(membershipRepo)
+	membershipService := membership.NewService(membershipRepo, notificationService, userService, workspaceRepo)
 	membershipHandler := membership.NewHandler(membershipService, userService)
 
 	// Create server
@@ -87,7 +93,8 @@ func main() {
 		boardHandler, boardService,
 		columnHandler, columnService,
 		taskHandler, taskService,
-		labelHandler, labelService)
+		labelHandler, labelService,
+		notificationHandler, notificationService)
 	s.MountHandlers()
 
 	// Start HTTP server

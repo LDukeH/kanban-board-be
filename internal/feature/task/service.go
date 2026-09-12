@@ -3,35 +3,49 @@ package task
 import (
 	"context"
 	"fmt"
+
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/membership"
+	"kanban-board-be/internal/feature/notification"
+	"kanban-board-be/internal/feature/user"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type taskRepository interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
 	Create(ctx context.Context, task *Task) error
 	UpdateTask(ctx context.Context, task *Task) error
 	GetByID(ctx context.Context, taskID uuid.UUID) (*Task, error)
 	UpdateTaskPosition(ctx context.Context, task *Task) error
 	DeleteTask(ctx context.Context, taskID uuid.UUID) error
 	GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error)
-	AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
+	AssignUserToTaskTx(ctx context.Context, tx pgx.Tx, taskID uuid.UUID, userID uuid.UUID) error
 	RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 	IsUserAssignedToTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (bool, error)
 	GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]*UsersTaskResponse, error)
 }
 
 type Service struct {
-	taskRepo taskRepository
-	authz    *authz.Service
+	taskRepo            taskRepository
+	authz               *authz.Service
+	notificationService *notification.Service
+	userService         *user.Service
 }
 
-func NewService(taskRepo taskRepository, authz *authz.Service) *Service {
+func NewService(
+	taskRepo taskRepository,
+	authz *authz.Service,
+	notificationService *notification.Service,
+	userService *user.Service,
+) *Service {
 	return &Service{
-		taskRepo: taskRepo,
-		authz:    authz,
+		taskRepo:            taskRepo,
+		authz:               authz,
+		notificationService: notificationService,
+		userService:         userService,
 	}
 }
 
@@ -143,7 +157,44 @@ func (s *Service) AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID
 		return apperrors.ErrForbidden
 	}
 
-	return s.taskRepo.AssignUserToTask(ctx, taskID, assignedUserID)
+	// The assignment and its notification must be all-or-nothing.
+	tx, err := s.taskRepo.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := s.taskRepo.AssignUserToTaskTx(ctx, tx, taskID, assignedUserID); err != nil {
+		return fmt.Errorf("failed to assign user to task: %w", err)
+	}
+
+	// Self-assignment does not create a notification.
+	if assignedUserID != userID {
+		task, err := s.taskRepo.GetByID(ctx, taskID)
+		if err != nil {
+			return fmt.Errorf("failed to get task for notification: %w", err)
+		}
+
+		taskTitle := ""
+		if task.Title != nil {
+			taskTitle = *task.Title
+		}
+
+		actor, err := s.userService.GetUserByID(ctx, userID.String())
+		if err != nil {
+			return fmt.Errorf("failed to get actor for notification: %w", err)
+		}
+
+		if err := s.notificationService.NotifyTaskAssignedTx(ctx, tx, assignedUserID, taskID, taskTitle, actor.Email); err != nil {
+			return fmt.Errorf("failed to create task assignment notification: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit task assignment: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, removedUserID uuid.UUID) error {

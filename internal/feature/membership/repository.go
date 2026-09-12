@@ -20,6 +20,9 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
+func (r *Repository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.Begin(ctx)
+}
 func (r *Repository) Create(ctx context.Context, membership *WorkspaceMembership) error {
 	query :=
 		`INSERT INTO workspace_memberships (

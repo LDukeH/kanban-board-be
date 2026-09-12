@@ -8,6 +8,7 @@ import (
 	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
+	"kanban-board-be/internal/feature/notification"
 	"kanban-board-be/internal/feature/task"
 	"kanban-board-be/internal/feature/user"
 	"kanban-board-be/internal/feature/workspace"
@@ -46,6 +47,10 @@ type Server struct {
 	// labelHandler *label.Handler
 	labelHandler *label.Handler
 	labelService *label.Service
+
+	// notificationHandler *notification.Handler
+	notificationHandler *notification.Handler
+	notificationService *notification.Service
 }
 
 func CreateNewServer(
@@ -64,23 +69,27 @@ func CreateNewServer(
 	taskService *task.Service,
 	labelHandler *label.Handler,
 	labelService *label.Service,
+	notificationHandler *notification.Handler,
+	notificationService *notification.Service,
 ) *Server {
 	s := &Server{
-		userHandler:       userHandler,
-		authHandler:       authHandler,
-		authService:       authService,
-		workspaceHandler:  workspaceHandler,
-		workspaceService:  workspaceService,
-		membershipHandler: membershipHandler,
-		membershipService: membershipService,
-		boardHandler:      boardHandler,
-		boardService:      boardService,
-		columnHandler:     columnHandler,
-		columnService:     columnService,
-		taskHandler:       taskHandler,
-		taskService:       taskService,
-		labelHandler:      labelHandler,
-		labelService:      labelService,
+		userHandler:         userHandler,
+		authHandler:         authHandler,
+		authService:         authService,
+		workspaceHandler:    workspaceHandler,
+		workspaceService:    workspaceService,
+		membershipHandler:   membershipHandler,
+		membershipService:   membershipService,
+		boardHandler:        boardHandler,
+		boardService:        boardService,
+		columnHandler:       columnHandler,
+		columnService:       columnService,
+		taskHandler:         taskHandler,
+		taskService:         taskService,
+		labelHandler:        labelHandler,
+		labelService:        labelService,
+		notificationHandler: notificationHandler,
+		notificationService: notificationService,
 	}
 	s.Router = chi.NewRouter()
 	return s

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -491,4 +492,23 @@ func (r *Repository) GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]
 		return nil, fmt.Errorf("error iterating over user rows: %w", err)
 	}
 	return users, nil
+}
+
+func (r *Repository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.Begin(ctx)
+}
+
+func (r *Repository) AssignUserToTaskTx(ctx context.Context, tx pgx.Tx, taskID uuid.UUID, userID uuid.UUID) error {
+	query := `
+INSERT INTO task_assignees (task_id, user_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+	_, err := tx.Exec(ctx, query, taskID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to assign user to task: %w", err)
+	}
+
+	return nil
 }

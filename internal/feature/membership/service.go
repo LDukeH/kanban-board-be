@@ -3,15 +3,20 @@ package membership
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/notification"
+	"kanban-board-be/internal/feature/user"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
 type membershipRepository interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
 	Create(ctx context.Context, membership *WorkspaceMembership) error
+	CreateTx(ctx context.Context, tx pgx.Tx, membership *WorkspaceMembership) error
 	ChangeMemberRole(ctx context.Context, membership *WorkspaceMembership) error
 	RemoveMember(ctx context.Context, workspaceMembership *WorkspaceMembership) error
 	GetByUserAndWorkspaceID(ctx context.Context, userID uuid.UUID, workspaceID uuid.UUID) (*WorkspaceMembership, error)
@@ -19,13 +24,29 @@ type membershipRepository interface {
 	GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID) ([]*WorkspaceMemberResponse, error)
 }
 
-type Service struct {
-	membershipRepo membershipRepository
+// workspaceNameProvider loads a workspace's name. It is satisfied by the workspace repository.
+type workspaceNameProvider interface {
+	GetWorkspaceName(ctx context.Context, workspaceID uuid.UUID) (string, error)
 }
 
-func NewService(membershipRepo membershipRepository) *Service {
+type Service struct {
+	membershipRepo      membershipRepository
+	workspaceRepo       workspaceNameProvider
+	notificationService *notification.Service
+	userService         *user.Service
+}
+
+func NewService(
+	membershipRepo membershipRepository,
+	notificationService *notification.Service,
+	userService *user.Service,
+	workspaceRepo workspaceNameProvider,
+) *Service {
 	return &Service{
-		membershipRepo: membershipRepo,
+		membershipRepo:      membershipRepo,
+		workspaceRepo:       workspaceRepo,
+		notificationService: notificationService,
+		userService:         userService,
 	}
 }
 
@@ -42,7 +63,39 @@ func (s *Service) CreateMembership(ctx context.Context, membership *WorkspaceMem
 		return apperrors.ErrForbidden
 	}
 
-	return s.membershipRepo.Create(ctx, membership)
+	// The membership and its notification must be all-or-nothing.
+	tx, err := s.membershipRepo.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := s.membershipRepo.CreateTx(ctx, tx, membership); err != nil {
+		return fmt.Errorf("failed to create membership: %w", err)
+	}
+
+	// Adding yourself to a workspace does not create a notification.
+	if membership.UserID != userID {
+		workspaceName, err := s.workspaceRepo.GetWorkspaceName(ctx, membership.WorkspaceID)
+		if err != nil {
+			return fmt.Errorf("failed to get workspace name for notification: %w", err)
+		}
+
+		actor, err := s.userService.GetUserByID(ctx, userID.String())
+		if err != nil {
+			return fmt.Errorf("failed to get actor for notification: %w", err)
+		}
+
+		if err := s.notificationService.NotifyWorkspaceInvitedTx(ctx, tx, membership.UserID, membership.WorkspaceID, workspaceName, actor.Email); err != nil {
+			return fmt.Errorf("failed to create workspace invitation notification: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit membership creation: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) ChangeMemberRole(ctx context.Context, membership *WorkspaceMembership, userID uuid.UUID) error {

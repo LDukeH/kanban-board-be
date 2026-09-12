@@ -170,6 +170,21 @@ func (r *Repository) GetList(ctx context.Context) ([]*Workspace, error) {
 	return workspaces, nil
 }
 
+func (r *Repository) GetWorkspaceName(ctx context.Context, workspaceID uuid.UUID) (string, error) {
+	query := `
+SELECT name
+FROM workspaces
+WHERE id = $1
+`
+
+	var name string
+	err := r.pool.QueryRow(ctx, query, workspaceID).Scan(&name)
+	if err != nil {
+		return "", fmt.Errorf("failed to get workspace name: %w", err)
+	}
+
+	return name, nil
+}
 func (r *Repository) GetMembership(
 	ctx context.Context,
 	userID, workspaceID uuid.UUID,
