@@ -11,6 +11,7 @@ import (
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
+	"kanban-board-be/internal/feature/comment"
 	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/notification"
@@ -53,6 +54,7 @@ func main() {
 	taskRepo := task.NewRepository(pool)
 	labelRepo := label.NewRepository(pool)
 	notificationRepo := notification.NewRepository(pool)
+	commentRepo := comment.NewRepository(pool)
 	// Authorization injection
 	authzService := authz.NewService(membershipRepo, boardRepo, columnRepo, taskRepo, labelRepo)
 	authService := auth.NewService(userService, authConfig)
@@ -85,6 +87,10 @@ func main() {
 	membershipService := membership.NewService(membershipRepo, notificationService, userService, workspaceRepo)
 	membershipHandler := membership.NewHandler(membershipService, userService)
 
+	// Comment
+	commentService := comment.NewService(commentRepo, authzService)
+	commentHandler := comment.NewHandler(commentService)
+
 	// Create server
 	s := server.CreateNewServer(
 		userHandler, authHandler, authService,
@@ -94,7 +100,8 @@ func main() {
 		columnHandler, columnService,
 		taskHandler, taskService,
 		labelHandler, labelService,
-		notificationHandler, notificationService)
+		notificationHandler, notificationService,
+		commentHandler, commentService)
 	s.MountHandlers()
 
 	// Start HTTP server

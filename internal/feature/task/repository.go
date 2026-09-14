@@ -179,7 +179,6 @@ func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 		setClauses = append(setClauses, "description = $2")
 		args = append(args, *task.Description)
 	}
-
 	if len(setClauses) == 0 {
 		return nil // Nothing to update
 	}

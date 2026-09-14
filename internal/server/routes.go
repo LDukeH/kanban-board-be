@@ -121,6 +121,17 @@ func (s *Server) MountHandlers() {
 				r.Post("/", s.taskHandler.AssignUserToTask)
 				r.Delete("/", s.taskHandler.RemoveUserFromTask)
 			})
+
+			// Comments attached to task
+			r.Route("/{taskID}/comments", func(r chi.Router) {
+				r.Get("/", s.commentHandler.ListComments)
+				r.Post("/", s.commentHandler.CreateComment)
+			})
+		})
+
+		// Comments
+		r.Route("/comments", func(r chi.Router) {
+			r.Delete("/{commentID}", s.commentHandler.DeleteComment)
 		})
 
 		// Notifications

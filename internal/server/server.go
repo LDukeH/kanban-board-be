@@ -6,6 +6,7 @@ import (
 	"kanban-board-be/internal/feature/auth"
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
+	"kanban-board-be/internal/feature/comment"
 	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/notification"
@@ -51,6 +52,10 @@ type Server struct {
 	// notificationHandler *notification.Handler
 	notificationHandler *notification.Handler
 	notificationService *notification.Service
+
+	// commentHandler *comment.Handler
+	commentHandler *comment.Handler
+	commentService *comment.Service
 }
 
 func CreateNewServer(
@@ -71,6 +76,8 @@ func CreateNewServer(
 	labelService *label.Service,
 	notificationHandler *notification.Handler,
 	notificationService *notification.Service,
+	commentHandler *comment.Handler,
+	commentService *comment.Service,
 ) *Server {
 	s := &Server{
 		userHandler:         userHandler,
@@ -90,6 +97,8 @@ func CreateNewServer(
 		labelService:        labelService,
 		notificationHandler: notificationHandler,
 		notificationService: notificationService,
+		commentHandler:      commentHandler,
+		commentService:      commentService,
 	}
 	s.Router = chi.NewRouter()
 	return s

@@ -54,6 +54,11 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Description != nil && !isValidTaskDescription(*req.Description) {
+		http.Error(w, "Invalid task description", http.StatusBadRequest)
+		return
+	}
+
 	task := Task{
 		ColumnID:    columnID,
 		Title:       req.Title,
@@ -90,6 +95,11 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid task data", http.StatusBadRequest)
+		return
+	}
+
+	if req.Description != nil && !isValidTaskDescription(*req.Description) {
+		http.Error(w, "Invalid task description", http.StatusBadRequest)
 		return
 	}
 
