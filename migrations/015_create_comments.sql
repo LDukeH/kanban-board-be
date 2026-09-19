@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- Comments belong to a task and are authored by an authenticated user.
 --
 -- A comment is immutable except deletion: there is no update endpoint, so

@@ -130,12 +130,22 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateWorkspace(r.Context(), workspace, userID); err != nil {
-		log.Printf("ERROR updating workspace: %v\n", apperrors.ErrConflict)
+		log.Printf("ERROR updating workspace: %v\n", err)
 		apperrors.WriteError(w, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Return the updated workspace so clients can read the new name/timestamps.
+	updated, err := h.service.GetWorkspaceByID(r.Context(), workspaceID.String(), userID)
+	if err != nil {
+		log.Printf("ERROR fetching updated workspace: %v\n", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(updated)
 }
 
 func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {

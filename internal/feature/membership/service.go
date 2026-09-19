@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type membershipRepository interface {
@@ -71,6 +72,12 @@ func (s *Service) CreateMembership(ctx context.Context, membership *WorkspaceMem
 	defer tx.Rollback(ctx)
 
 	if err := s.membershipRepo.CreateTx(ctx, tx, membership); err != nil {
+		// Re-inviting an existing member violates the (user_id, workspace_id)
+		// unique constraint: report it as a conflict, not a 500.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return apperrors.ErrConflict
+		}
 		return fmt.Errorf("failed to create membership: %w", err)
 	}
 
@@ -165,6 +172,12 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceMembership *Workspa
 	// repository can also remove the member's task assignments. The incoming
 	// `workspaceMembership` from the handler only has ID + WorkspaceID.
 	return s.membershipRepo.RemoveMember(ctx, targetMembership)
+}
+
+// GetMembershipByID returns a single membership by its ID, used to build
+// update responses (e.g. after a role change).
+func (s *Service) GetMembershipByID(ctx context.Context, membershipID uuid.UUID) (*WorkspaceMembership, error) {
+	return s.membershipRepo.GetByID(ctx, membershipID)
 }
 
 func (s *Service) GetMemberListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID, userID uuid.UUID) ([]*WorkspaceMemberResponse, error) {

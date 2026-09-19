@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- Experimental: This migration is a bit more complex than the others, and it is not yet fully tested. It is recommended to run this migration in a staging environment first before applying it to production.
 -- Not yet implemented
 

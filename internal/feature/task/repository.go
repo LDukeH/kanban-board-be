@@ -478,7 +478,9 @@ func (r *Repository) GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]
 	}
 	defer rows.Close()
 
-	var users []*UsersTaskResponse
+	// Initialize as an empty slice so an empty assignment list is encoded as
+	// `[]` instead of `null`.
+	users := []*UsersTaskResponse{}
 	for rows.Next() {
 		user := &UsersTaskResponse{}
 		err := rows.Scan(&user.UserID, &user.Email)

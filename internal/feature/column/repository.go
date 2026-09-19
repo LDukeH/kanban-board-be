@@ -26,9 +26,9 @@ func (r *Repository) Create(ctx context.Context, column *Column) error {
 		position
 	)
 	VALUES ($1, $2, COALESCE((SELECT MAX(position) + 1 FROM columns WHERE board_id = $1), 0))
-	RETURNING id, created_at, updated_at`
+	RETURNING id, position, created_at, updated_at`
 
-	return r.pool.QueryRow(ctx, query, column.BoardID, column.Name).Scan(&column.ID, &column.CreatedAt, &column.UpdatedAt)
+	return r.pool.QueryRow(ctx, query, column.BoardID, column.Name).Scan(&column.ID, &column.Position, &column.CreatedAt, &column.UpdatedAt)
 }
 
 func (r *Repository) GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error) {

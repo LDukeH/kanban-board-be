@@ -1,3 +1,5 @@
+-- +goose Up
+
     CREATE TABLE task_labels (
         task_id UUID NOT NULL,
         label_id UUID NOT NULL,

@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- Convert tasks.description from TEXT to JSONB so the column can store the
 -- Tiptap JSON document the frontend sends and reads back:
 --

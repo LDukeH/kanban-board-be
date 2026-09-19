@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE task_assignees (
     task_id UUID NOT NULL,
     user_id UUID NOT NULL,

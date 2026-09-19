@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- Align the notifications table with the Source of Truth (Notification contract, notifications section).
 --
 -- The previous shape (message + is_read boolean) is replaced with a generic schema

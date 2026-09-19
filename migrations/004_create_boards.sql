@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE boards (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID NOT NULL,

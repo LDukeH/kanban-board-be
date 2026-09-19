@@ -2,12 +2,14 @@ package board
 
 import (
 	"context"
+	"errors"
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/membership"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type boardRepository interface {
@@ -53,6 +55,10 @@ func (s *Service) GetBoardsByWorkspaceID(ctx context.Context, workspaceID uuid.U
 func (s *Service) GetBoardByID(ctx context.Context, boardID uuid.UUID, userID uuid.UUID) (*Board, error) {
 	board, err := s.boardRepo.GetByID(ctx, boardID)
 	if err != nil {
+		// A missing board (e.g. after deletion) must surface as 404, not 500.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrNotFound
+		}
 		return nil, err
 	}
 

@@ -29,6 +29,10 @@ func (h *Handler) CreateMembership(w http.ResponseWriter, r *http.Request) {
 	var req MembershipCreateRequest
 	workspaceIDStr := chi.URLParam(r, "workspaceID")
 	workspaceID, err := uuid.Parse(workspaceIDStr)
+	if err != nil {
+		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
+		return
+	}
 
 	userID, err := auth.GetUserID(r)
 	if err != nil {
@@ -68,7 +72,13 @@ func (h *Handler) CreateMembership(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(workspaceMembership)
+	json.NewEncoder(w).Encode(WorkspaceMemberResponse{
+		ID:          workspaceMembership.ID,
+		WorkspaceID: workspaceMembership.WorkspaceID,
+		UserID:      workspaceMembership.UserID,
+		Role:        workspaceMembership.Role,
+		Email:       user.Email,
+	})
 }
 
 func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +126,27 @@ func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Return the updated membership so clients can read the new role.
+	updated, err := h.membershipService.GetMembershipByID(r.Context(), membershipID)
+	if err != nil {
+		log.Printf("ERROR reading updated membership: %v\n", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	response := WorkspaceMemberResponse{
+		ID:          updated.ID,
+		WorkspaceID: updated.WorkspaceID,
+		UserID:      updated.UserID,
+		Role:        updated.Role,
+	}
+	if member, uerr := h.userService.GetUserByID(r.Context(), updated.UserID.String()); uerr == nil {
+		response.Email = member.Email
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {

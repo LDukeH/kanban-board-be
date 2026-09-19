@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/user"
@@ -134,8 +135,11 @@ func (h *Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	getMeResponse := GetMeResponse{
-		ID:    user.ID.String(),
-		Email: user.Email,
+		ID:           user.ID.String(),
+		Email:        user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Format(time.RFC3339Nano),
+		UpdatedAt:    user.UpdatedAt.Format(time.RFC3339Nano),
 	}
 
 	json.NewEncoder(w).Encode(getMeResponse)

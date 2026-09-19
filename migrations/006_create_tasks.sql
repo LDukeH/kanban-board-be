@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     column_id UUID NOT NULL,

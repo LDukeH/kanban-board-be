@@ -154,7 +154,17 @@ func (h *Handler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Return the updated board so clients can read the new name/timestamps.
+	updated, err := h.service.GetBoardByID(r.Context(), boardID, userID)
+	if err != nil {
+		log.Printf("ERROR: Failed to read updated board: %v", err)
+		apperrors.WriteError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(updated)
 }
 
 func (h *Handler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
