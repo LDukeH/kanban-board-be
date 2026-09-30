@@ -78,29 +78,14 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    token, // Your JWT string
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false, // Set to true in production (HTTPS)
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, newAccessTokenCookie(token, int(h.authService.config.Expiration.Seconds())))
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// Clear the cookie by setting its MaxAge to -1
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false, // Set to true in production (HTTPS)
-		MaxAge:   -1,
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, clearAccessTokenCookie())
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -113,15 +98,7 @@ func (h *Handler) DeleteMyAccountHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Account is gone: clear the access_token cookie (same as logout)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false, // Set to true in production (HTTPS)
-		MaxAge:   -1,
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, clearAccessTokenCookie())
 
 	w.WriteHeader(http.StatusNoContent)
 }
