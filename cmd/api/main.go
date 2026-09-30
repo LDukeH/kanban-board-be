@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ func main() {
 		log.Println("No .env file found")
 	}
 
-	pool, err := db.NewPostgresPool()
+	pool, err := db.NewPostgresPool(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -57,7 +58,7 @@ func main() {
 	notificationRepo := notification.NewRepository(pool)
 	commentRepo := comment.NewRepository(pool)
 	// Authorization injection
-	authzService := authz.NewService(membershipRepo, boardRepo, columnRepo, taskRepo, labelRepo)
+	authzService := authz.NewService(membershipRepo)
 	authService := auth.NewService(userService, authConfig)
 	authHandler := auth.NewHandler(authService)
 
@@ -117,6 +118,14 @@ func main() {
 		port = "3000"
 	}
 
-log.Fatal(http.ListenAndServe(":"+port, s.Router))
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           s.Router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 
+	log.Fatal(srv.ListenAndServe())
 }

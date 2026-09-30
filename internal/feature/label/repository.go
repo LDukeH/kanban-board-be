@@ -115,18 +115,6 @@ func (r *repository) DeleteLabel(ctx context.Context, labelID uuid.UUID) error {
 	return err
 }
 
-// GetLabelBoardID returns the board ID for a given label.
-// This satisfies the authz.LabelBoardProvider interface.
-func (r *repository) GetLabelBoardID(ctx context.Context, labelID uuid.UUID) (uuid.UUID, error) {
-	query := `SELECT board_id FROM labels WHERE id = $1`
-	var boardID uuid.UUID
-	err := r.pool.QueryRow(ctx, query, labelID).Scan(&boardID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to get label board ID: %w", err)
-	}
-	return boardID, nil
-}
-
 // This is to assign a label to a task. It creates a new entry in the task_labels table.
 func (r *repository) AddLabelToTask(ctx context.Context, taskID, labelID uuid.UUID) error {
 	query := `

@@ -12,129 +12,128 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// MembershipProvider can load a workspace membership for a user.
-type MembershipProvider interface {
-	GetMembership(ctx context.Context, userID, workspaceID uuid.UUID) (*membership.WorkspaceMembership, error)
-}
+// Resolver resolves a user's access to a workspace-scoped resource.
+//
+// Each method answers "which workspace owns this resource, and what is the
+// user's role in it?" with one SQL statement that joins the resource up to
+// workspace_memberships. The previous implementation walked the ownership
+// chain one hop per query (task -> column -> board -> workspace -> membership),
+// costing up to four database round trips per authorized request; on a
+// serverless deployment talking to a remote database those round trips, not
+// the query plans, dominate response time.
+//
+// A missing resource and a resource the user cannot see are reported the same
+// way (pgx.ErrNoRows) because the two are indistinguishable through this
+// interface; the caller maps both to apperrors.ErrForbidden.
+type Resolver interface {
+	// GetWorkspaceRole returns the user's role in the workspace.
+	GetWorkspaceRole(ctx context.Context, userID, workspaceID uuid.UUID) (membership.WorkspaceRole, error)
 
-// BoardWorkspaceProvider can resolve a board ID to its workspace ID.
-type BoardWorkspaceProvider interface {
-	GetBoardWorkspaceID(ctx context.Context, boardID uuid.UUID) (uuid.UUID, error)
-}
+	// GetBoardRole returns the workspace that owns the board and the user's role in it.
+	GetBoardRole(ctx context.Context, userID, boardID uuid.UUID) (uuid.UUID, membership.WorkspaceRole, error)
 
-// ColumnBoardProvider can resolve a column ID to its board ID.
-type ColumnBoardProvider interface {
-	GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (uuid.UUID, error)
-}
+	// GetColumnRole returns the board that owns the column and the user's role in the column's workspace.
+	GetColumnRole(ctx context.Context, userID, columnID uuid.UUID) (uuid.UUID, membership.WorkspaceRole, error)
 
-// TaskColumnProvider can resolve a task ID to its column ID.
-type TaskColumnProvider interface {
-	GetTaskColumnID(ctx context.Context, taskID uuid.UUID) (uuid.UUID, error)
-}
+	// GetTaskRole returns the task's column, that column's board, and the user's role in the task's workspace.
+	GetTaskRole(ctx context.Context, userID, taskID uuid.UUID) (columnID, boardID uuid.UUID, role membership.WorkspaceRole, err error)
 
-// LabelBoardProvider can resolve a label ID to its board ID.
-type LabelBoardProvider interface {
-	GetLabelBoardID(ctx context.Context, labelID uuid.UUID) (uuid.UUID, error)
+	// GetLabelRole returns the board that owns the label and the user's role in the label's workspace.
+	GetLabelRole(ctx context.Context, userID, labelID uuid.UUID) (uuid.UUID, membership.WorkspaceRole, error)
 }
 
 // Service provides authorization checks for workspace-scoped resources.
 type Service struct {
-	membershipProvider MembershipProvider
-	boardProvider      BoardWorkspaceProvider
-	columnProvider     ColumnBoardProvider
-	taskProvider       TaskColumnProvider
-	labelProvider      LabelBoardProvider
+	resolver Resolver
 }
 
 // NewService creates a new authorization service.
-// Only inject the providers that are actually needed.
-func NewService(
-	membershipProvider MembershipProvider,
-	boardProvider BoardWorkspaceProvider,
-	columnProvider ColumnBoardProvider,
-	taskProvider TaskColumnProvider,
-	labelProvider LabelBoardProvider,
-) *Service {
-	return &Service{
-		membershipProvider: membershipProvider,
-		boardProvider:      boardProvider,
-		columnProvider:     columnProvider,
-		taskProvider:       taskProvider,
-		labelProvider:      labelProvider,
-	}
+func NewService(resolver Resolver) *Service {
+	return &Service{resolver: resolver}
 }
 
-// GetWorkspaceRole returns the user's role in the workspace.
+// mapAccessError keeps "not a member" and "does not exist" as 403 Forbidden
+// (the workspace is the authorization boundary, so a caller never learns which
+// of the two happened) while any other failure stays a 500.
+func mapAccessError(err error, operation string) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperrors.ErrForbidden
+	}
+	return fmt.Errorf("%s: %w", operation, err)
+}
+
+// GetWorkspaceRole returns the user's role in the workspace, or ErrForbidden
+// when the user is not a member of it.
 func (s *Service) GetWorkspaceRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	workspaceID uuid.UUID,
 ) (membership.WorkspaceRole, error) {
-	m, err := s.membershipProvider.GetMembership(ctx, userID, workspaceID)
+	role, err := s.resolver.GetWorkspaceRole(ctx, userID, workspaceID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", apperrors.ErrForbidden
-		}
-		return "", fmt.Errorf("get membership: %w", err)
+		return "", mapAccessError(err, "resolve workspace access")
 	}
-
-	return m.Role, nil
+	return role, nil
 }
 
-// GetBoardRole resolves the board's workspace and returns the user's role.
+// GetBoardRole returns the user's role in the workspace that owns the board.
 func (s *Service) GetBoardRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	boardID uuid.UUID,
 ) (membership.WorkspaceRole, error) {
-	workspaceID, err := s.boardProvider.GetBoardWorkspaceID(ctx, boardID)
+	_, role, err := s.resolver.GetBoardRole(ctx, userID, boardID)
 	if err != nil {
-		return "", fmt.Errorf("get board workspace: %w", err)
+		return "", mapAccessError(err, "resolve board access")
 	}
-
-	return s.GetWorkspaceRole(ctx, userID, workspaceID)
+	return role, nil
 }
 
-// GetColumnRole resolves the column's board and workspace, then returns the user's role.
+// GetColumnRole returns the user's role in the workspace that owns the column.
 func (s *Service) GetColumnRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	columnID uuid.UUID,
 ) (membership.WorkspaceRole, error) {
-	boardID, err := s.columnProvider.GetColumnBoardID(ctx, columnID)
+	_, role, err := s.resolver.GetColumnRole(ctx, userID, columnID)
 	if err != nil {
-		return "", fmt.Errorf("get column board: %w", err)
+		return "", mapAccessError(err, "resolve column access")
 	}
-	return s.GetBoardRole(ctx, userID, boardID)
+	return role, nil
 }
 
-// GetTaskRole resolves the task's column, board, and workspace, then returns the user's role.
+// GetTaskRole returns the user's role in the workspace that owns the task.
 func (s *Service) GetTaskRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	taskID uuid.UUID,
 ) (membership.WorkspaceRole, error) {
-	columnID, err := s.taskProvider.GetTaskColumnID(ctx, taskID)
+	_, _, role, err := s.resolver.GetTaskRole(ctx, userID, taskID)
 	if err != nil {
-		return "", fmt.Errorf("get task column: %w", err)
+		return "", mapAccessError(err, "resolve task access")
 	}
-	return s.GetColumnRole(ctx, userID, columnID)
+	return role, nil
 }
 
-// GetLabelRole resolves the label's board and workspace, then returns the user's role.
+// GetLabelRole returns the user's role in the workspace that owns the label.
 func (s *Service) GetLabelRole(
 	ctx context.Context,
 	userID uuid.UUID,
 	labelID uuid.UUID,
 ) (membership.WorkspaceRole, error) {
-	boardID, err := s.labelProvider.GetLabelBoardID(ctx, labelID)
+	_, role, err := s.resolver.GetLabelRole(ctx, userID, labelID)
 	if err != nil {
-		return "", fmt.Errorf("get label board: %w", err)
+		return "", mapAccessError(err, "resolve label access")
 	}
-	return s.GetBoardRole(ctx, userID, boardID)
+	return role, nil
 }
 
-// GetColumnBoardID returns the board ID for a given column.
-func (s *Service) GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (uuid.UUID, error) {
-	return s.columnProvider.GetColumnBoardID(ctx, columnID)
+// GetColumnBoardID returns the board that owns the column after verifying the
+// user can access it, so a caller cannot use it to probe another workspace.
+func (s *Service) GetColumnBoardID(ctx context.Context, userID uuid.UUID, columnID uuid.UUID) (uuid.UUID, error) {
+	boardID, _, err := s.resolver.GetColumnRole(ctx, userID, columnID)
+	if err != nil {
+		return uuid.Nil, mapAccessError(err, "resolve column access")
+	}
+	return boardID, nil
 }

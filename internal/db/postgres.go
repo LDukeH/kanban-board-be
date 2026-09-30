@@ -4,22 +4,56 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewPostgresPool() (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+const (
+	// connectTimeout bounds dialing the pooler. Without it a cold serverless
+	// instance can block on a TCP handshake until the platform kills it.
+	connectTimeout = 5 * time.Second
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to create connection pool: %v\n", err)
-		os.Exit(1)
+	// Each serverless instance is short-lived and Supabase's pooler enforces a
+	// hard client limit, so keep the per-instance footprint deliberately small.
+	maxConns = 4
+	minConns = 1
+)
+
+// NewPostgresPool parses DATABASE_URL into a bounded pgx pool with explicit
+// timeouts so a slow or unreachable database surfaces as a request error
+// instead of a hung (or platform-killed) function invocation.
+func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, fmt.Errorf("DATABASE_URL is not set")
 	}
 
-	if err := pool.Ping(context.Background()); err != nil {
-		pool.Close()
-		fmt.Print("Can't reach the database")
-		return nil, err
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
+	}
+
+	cfg.MaxConns = maxConns
+	cfg.MinConns = minConns
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.HealthCheckPeriod = time.Minute
+	cfg.ConnConfig.ConnectTimeout = connectTimeout
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create connection pool: %w", err)
+	}
+
+	// Ping with a deadline so the handshake cannot exceed connectTimeout. A
+	// failed ping is logged rather than fatal: the pool dials lazily and the
+	// first real query is bounded by its request context anyway.
+	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
+	defer cancel()
+
+	if err := pool.Ping(pingCtx); err != nil {
+		fmt.Fprintf(os.Stderr, "database ping failed (continuing): %v\n", err)
 	}
 
 	return pool, nil

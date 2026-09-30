@@ -65,23 +65,52 @@ func (r *Repository) CreateTx(
 	)
 }
 
-// Member workspaces with the caller's role and counts; subqueries avoid a cartesian product.
+// Member workspaces with the caller's role and counts.
+//
+// The counts are computed by two grouped scans restricted to the caller's
+// workspaces, instead of a COUNT subquery per returned row: the previous shape
+// planned 2N correlated subqueries, so a user in ten workspaces paid twenty
+// extra subplans for the same numbers.
 func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error) {
-	query :=
-		`SELECT
-		w.id,
-		w.name,
-		w.description,
-		wm.role,
-		(SELECT COUNT(*) FROM workspace_memberships m WHERE m.workspace_id = w.id) AS member_count,
-		(SELECT COUNT(*) FROM boards b WHERE b.workspace_id = w.id) AS board_count,
-		w.created_at,
-		w.updated_at
-	FROM workspaces w
-	INNER JOIN workspace_memberships wm
-		ON wm.workspace_id = w.id
-	WHERE wm.user_id = $1
-	ORDER BY w.created_at ASC
+	query := `
+		WITH user_workspaces AS (
+			SELECT
+				w.id,
+				w.name,
+				w.description,
+				wm.role,
+				w.created_at,
+				w.updated_at
+			FROM workspaces w
+			INNER JOIN workspace_memberships wm
+				ON wm.workspace_id = w.id
+			WHERE wm.user_id = $1
+		),
+		member_counts AS (
+			SELECT m.workspace_id, COUNT(*) AS member_count
+			FROM workspace_memberships m
+			INNER JOIN user_workspaces uw ON uw.id = m.workspace_id
+			GROUP BY m.workspace_id
+		),
+		board_counts AS (
+			SELECT b.workspace_id, COUNT(*) AS board_count
+			FROM boards b
+			INNER JOIN user_workspaces uw ON uw.id = b.workspace_id
+			GROUP BY b.workspace_id
+		)
+		SELECT
+			uw.id,
+			uw.name,
+			uw.description,
+			uw.role,
+			COALESCE(mc.member_count, 0) AS member_count,
+			COALESCE(bc.board_count, 0) AS board_count,
+			uw.created_at,
+			uw.updated_at
+		FROM user_workspaces uw
+		LEFT JOIN member_counts mc ON mc.workspace_id = uw.id
+		LEFT JOIN board_counts bc ON bc.workspace_id = uw.id
+		ORDER BY uw.created_at ASC
 	`
 
 	workspaces := []*WorkspaceSummary{}

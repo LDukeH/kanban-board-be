@@ -75,20 +75,6 @@ func (r *Repository) GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Co
 	return columns, nil
 }
 
-// GetColumnBoardID returns the board ID for a given column.
-// This satisfies the authz.ColumnBoardProvider interface.
-func (r *Repository) GetColumnBoardID(ctx context.Context, columnID uuid.UUID) (uuid.UUID, error) {
-	query := `SELECT board_id FROM columns WHERE id = $1`
-	fmt.Printf("GetColumnBoardID called with columnID: %s", columnID)
-	var boardID uuid.UUID
-	err := r.pool.QueryRow(ctx, query, columnID).Scan(&boardID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to get column board ID: %w", err)
-	}
-
-	return boardID, nil
-}
-
 func (r *Repository) GetByID(ctx context.Context, columnID uuid.UUID) (*Column, error) {
 	query :=
 		`SELECT

@@ -65,8 +65,54 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 	return task, nil
 }
 
+// GetByColumnID returns the column's tasks oldest-position first, each with its
+// labels and assignees.
+//
+// The labels and assignees are aggregated once per column in CTEs and joined
+// onto the task rows. The previous shape attached a json_agg subquery for each
+// relation to every task row, so the planner built 2N correlated subplans: one
+// index scan per task per relation even though all tasks share one column.
 func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error) {
 	query := `
+		WITH column_tasks AS (
+			SELECT id
+			FROM tasks
+			WHERE column_id = $1
+		),
+		task_labels_agg AS (
+			SELECT
+				tl.task_id,
+				json_agg(
+					json_build_object(
+						'id', l.id,
+						'board_id', l.board_id,
+						'name', l.name,
+						'color', l.color,
+						'created_at', l.created_at,
+						'updated_at', l.updated_at
+					)
+					ORDER BY l.name
+				) AS labels
+			FROM task_labels tl
+			JOIN labels l ON l.id = tl.label_id
+			WHERE tl.task_id IN (SELECT id FROM column_tasks)
+			GROUP BY tl.task_id
+		),
+		task_assignees_agg AS (
+			SELECT
+				ta.task_id,
+				json_agg(
+					json_build_object(
+						'user_id', u.id,
+						'email', u.email
+					)
+					ORDER BY u.email
+				) AS assignees
+			FROM task_assignees ta
+			JOIN users u ON u.id = ta.user_id
+			WHERE ta.task_id IN (SELECT id FROM column_tasks)
+			GROUP BY ta.task_id
+		)
 		SELECT
 			t.id,
 			t.column_id,
@@ -75,46 +121,11 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			t.position,
 			t.created_at,
 			t.updated_at,
-
-			COALESCE(
-				(
-					SELECT json_agg(
-						json_build_object(
-							'id', l.id,
-							'board_id', l.board_id,
-							'name', l.name,
-							'color', l.color,
-							'created_at', l.created_at,
-							'updated_at', l.updated_at
-						)
-						ORDER BY l.name
-					)
-					FROM task_labels tl
-					JOIN labels l
-						ON l.id = tl.label_id
-					WHERE tl.task_id = t.id
-				),
-				'[]'::json
-			) AS labels,
-
-			COALESCE(
-				(
-					SELECT json_agg(
-						json_build_object(
-							'user_id', u.id,
-							'email', u.email
-						)
-						ORDER BY u.email
-					)
-					FROM task_assignees ta
-					JOIN users u
-						ON u.id = ta.user_id
-					WHERE ta.task_id = t.id
-				),
-				'[]'::json
-			) AS assignees
-
+			COALESCE(tla.labels, '[]'::json) AS labels,
+			COALESCE(taa.assignees, '[]'::json) AS assignees
 		FROM tasks t
+		LEFT JOIN task_labels_agg tla ON tla.task_id = t.id
+		LEFT JOIN task_assignees_agg taa ON taa.task_id = t.id
 		WHERE t.column_id = $1
 		ORDER BY t.position ASC
 	`
@@ -340,20 +351,6 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 	}
 
 	return nil
-}
-
-// GetTaskColumnID returns the column ID for a given task.
-// This satisfies the authz.TaskColumnProvider interface.
-func (r *Repository) GetTaskColumnID(ctx context.Context, taskID uuid.UUID) (uuid.UUID, error) {
-	query := `SELECT column_id FROM tasks WHERE id = $1`
-
-	var columnID uuid.UUID
-	err := r.pool.QueryRow(ctx, query, taskID).Scan(&columnID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to get task column ID: %w", err)
-	}
-
-	return columnID, nil
 }
 
 func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID) error {

@@ -10,6 +10,12 @@ import (
 
 func (s *Server) MountHandlers() {
 	s.Router.Use(middleware.Logger)
+	// Recoverer turns a handler panic into a 500 response instead of letting
+	// the function die and surface as FUNCTION_INVOCATION_FAILED.
+	s.Router.Use(middleware.Recoverer)
+	// JSON responses are highly compressible; gzip cuts the bytes crossing the
+	// edge/function boundary for every list endpoint.
+	s.Router.Use(middleware.Compress(5))
 
 	frontendURL := os.Getenv("FRONTEND_URL")
 	if frontendURL == "" {

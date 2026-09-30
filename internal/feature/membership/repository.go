@@ -85,15 +85,6 @@ func (r *Repository) GetByID(
 	return membership, nil
 }
 
-// GetMembership satisfies the authz.MembershipProvider interface.
-func (r *Repository) GetMembership(
-	ctx context.Context,
-	userID uuid.UUID,
-	workspaceID uuid.UUID,
-) (*WorkspaceMembership, error) {
-	return r.GetByUserAndWorkspaceID(ctx, userID, workspaceID)
-}
-
 func (r *Repository) GetByUserAndWorkspaceID(
 	ctx context.Context,
 	userID uuid.UUID,

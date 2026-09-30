@@ -112,11 +112,10 @@ func (h *Handler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	getMeResponse := GetMeResponse{
-		ID:           user.ID.String(),
-		Email:        user.Email,
-		PasswordHash: user.PasswordHash,
-		CreatedAt:    user.CreatedAt.Format(time.RFC3339Nano),
-		UpdatedAt:    user.UpdatedAt.Format(time.RFC3339Nano),
+		ID:        user.ID.String(),
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339Nano),
+		UpdatedAt: user.UpdatedAt.Format(time.RFC3339Nano),
 	}
 
 	json.NewEncoder(w).Encode(getMeResponse)

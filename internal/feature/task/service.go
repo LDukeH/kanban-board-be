@@ -97,12 +97,12 @@ func (s *Service) UpdateTaskPosition(ctx context.Context, userID uuid.UUID, task
 	}
 
 	// Target column must exist and belong to the same board.
-	sourceBoardID, err := s.authz.GetColumnBoardID(ctx, currentTask.ColumnID)
+	sourceBoardID, err := s.authz.GetColumnBoardID(ctx, userID, currentTask.ColumnID)
 	if err != nil {
 		return err
 	}
 
-	targetBoardID, err := s.authz.GetColumnBoardID(ctx, task.ColumnID)
+	targetBoardID, err := s.authz.GetColumnBoardID(ctx, userID, task.ColumnID)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,6 @@ func (s *Service) AssignUserToTask(ctx context.Context, taskID uuid.UUID, userID
 	}
 
 	if roleAssignedUser != membership.Owner && roleAssignedUser != membership.Admin && roleAssignedUser != membership.Member {
-		fmt.Println("Assigned user is not a member of the workspace")
 		return apperrors.ErrForbidden
 	}
 
@@ -215,7 +214,6 @@ func (s *Service) RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, user
 		return err
 	}
 	if !isAssigned {
-		fmt.Println("User is not assigned to this task")
 		return apperrors.ErrNotFound
 	}
 

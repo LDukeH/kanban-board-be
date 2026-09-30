@@ -17,12 +17,14 @@ type RegisterRequest struct {
 	Password string `json:"password"`
 }
 
+// GetMeResponse is the public shape of `GET /auth/me`. It deliberately omits
+// the password hash: the hash is server-side secret material that no client
+// has a reason to receive.
 type GetMeResponse struct {
-	ID           string `json:"id"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type contextKey string

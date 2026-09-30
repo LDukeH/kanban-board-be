@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -197,9 +196,6 @@ func (h *Handler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	fmt.Println("Owner id:", userID)
-	fmt.Println("Transfer user id:", req.NewOwnerID)
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("ERROR decoding request body: %v\n", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
