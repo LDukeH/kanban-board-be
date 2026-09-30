@@ -3,8 +3,8 @@ package workspace
 import (
 	"context"
 	"fmt"
-	"log"
 
+	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/authz"
 	"kanban-board-be/internal/feature/membership"
 
@@ -18,13 +18,13 @@ type workspaceRepository interface {
 	CreateTx(ctx context.Context, tx pgx.Tx, workspace *Workspace) error
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*Workspace, error)
-	UpdateWorkspace(ctx context.Context, workspace *Workspace) error
+	UpdateWorkspace(ctx context.Context, update *WorkspaceUpdate) error
 	DeleteWorkspace(ctx context.Context, workspaceID uuid.UUID) error
 }
 
 type membershipRepository interface {
 	CreateTx(ctx context.Context, tx pgx.Tx, membership *membership.WorkspaceMembership) error
-	TransferOwnership(	ctx context.Context, oldOwnerID, newOwnerID, workspaceID uuid.UUID) error
+	TransferOwnership(ctx context.Context, oldOwnerID, newOwnerID, workspaceID uuid.UUID) error
 }
 
 type Service struct {
@@ -41,7 +41,19 @@ func NewService(workspaceRepo workspaceRepository, membershipRepo membershipRepo
 	}
 }
 
+// Empty is valid; "" is how a description-less workspace is stored.
+func validateWorkspaceDescription(description string) error {
+	if len(description) > maxWorkspaceDescriptionLength {
+		return apperrors.ErrValidation
+	}
+	return nil
+}
+
 func (s *Service) CreateWorkspace(ctx context.Context, workspace *Workspace, userID uuid.UUID) error {
+	if err := validateWorkspaceDescription(workspace.Description); err != nil {
+		return err
+	}
+
 	tx, err := s.workspaceRepo.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -96,11 +108,11 @@ func (s *Service) GetWorkspaceByID(ctx context.Context, id string, userID uuid.U
 	return workspace, nil
 }
 
-func (s *Service) UpdateWorkspace(ctx context.Context, workspace Workspace, userID uuid.UUID) error {
+// The owner check runs before the write, so a non-owner cannot bypass it with an empty payload.
+func (s *Service) UpdateWorkspace(ctx context.Context, update *WorkspaceUpdate, userID uuid.UUID) error {
 	// Check that the user is a owner of the workspace.
-	role, err := s.authz.GetWorkspaceRole(ctx, userID, workspace.ID)
+	role, err := s.authz.GetWorkspaceRole(ctx, userID, update.ID)
 
-	log.Default().Println("User role:", role)
 	if err != nil {
 		return fmt.Errorf("failed to get workspace role: %w", err)
 	}
@@ -108,8 +120,14 @@ func (s *Service) UpdateWorkspace(ctx context.Context, workspace Workspace, user
 		return fmt.Errorf("user is not authorized to update this workspace")
 	}
 
+	if update.Description != nil {
+		if err := validateWorkspaceDescription(*update.Description); err != nil {
+			return err
+		}
+	}
+
 	// Update the workspace
-	if err := s.workspaceRepo.UpdateWorkspace(ctx, &workspace); err != nil {
+	if err := s.workspaceRepo.UpdateWorkspace(ctx, update); err != nil {
 		return fmt.Errorf("failed to update workspace: %w", err)
 	}
 

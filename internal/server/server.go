@@ -7,6 +7,7 @@ import (
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/comment"
+	"kanban-board-be/internal/feature/invitation"
 	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/notification"
@@ -32,6 +33,10 @@ type Server struct {
 	// membershipHandler *membership.Handler
 	membershipHandler *membership.Handler
 	membershipService *membership.Service
+
+	// invitationHandler *invitation.Handler
+	invitationHandler *invitation.Handler
+	invitationService *invitation.Service
 
 	// boardHandler *board.Handler
 	boardHandler *board.Handler
@@ -66,6 +71,8 @@ func CreateNewServer(
 	workspaceService *workspace.Service,
 	membershipHandler *membership.Handler,
 	membershipService *membership.Service,
+	invitationHandler *invitation.Handler,
+	invitationService *invitation.Service,
 	boardHandler *board.Handler,
 	boardService *board.Service,
 	columnHandler *column.Handler,
@@ -87,6 +94,8 @@ func CreateNewServer(
 		workspaceService:    workspaceService,
 		membershipHandler:   membershipHandler,
 		membershipService:   membershipService,
+		invitationHandler:   invitationHandler,
+		invitationService:   invitationService,
 		boardHandler:        boardHandler,
 		boardService:        boardService,
 		columnHandler:       columnHandler,

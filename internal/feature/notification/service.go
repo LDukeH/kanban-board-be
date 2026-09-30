@@ -88,11 +88,13 @@ func (s *Service) NotifyWorkspaceInvitedTx(
 	ctx context.Context,
 	tx pgx.Tx,
 	recipientUserID uuid.UUID,
+	invitationID uuid.UUID,
 	workspaceID uuid.UUID,
 	workspaceName string,
 	actorEmail string,
 ) error {
 	payload, err := json.Marshal(WorkspaceInvitedPayload{
+		InvitationID:  invitationID,
 		WorkspaceID:   workspaceID,
 		WorkspaceName: workspaceName,
 		ActorEmail:    actorEmail,

@@ -20,22 +20,6 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-func (r *Repository) BeginTx(ctx context.Context) (pgx.Tx, error) {
-	return r.pool.Begin(ctx)
-}
-func (r *Repository) Create(ctx context.Context, membership *WorkspaceMembership) error {
-	query :=
-		`INSERT INTO workspace_memberships (
-			workspace_id,
-			user_id,
-			role
-		)
-	VALUES ($1, $2, $3)
-	RETURNING id, created_at, updated_at`
-
-	return r.pool.QueryRow(ctx, query, membership.WorkspaceID, membership.UserID, membership.Role).Scan(&membership.ID, &membership.CreatedAt, &membership.UpdatedAt)
-}
-
 func (r *Repository) CreateTx(
 	ctx context.Context,
 	tx pgx.Tx,

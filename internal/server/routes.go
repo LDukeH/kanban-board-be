@@ -1,6 +1,8 @@
 package server
 
 import (
+	"os"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -9,8 +11,13 @@ import (
 func (s *Server) MountHandlers() {
 	s.Router.Use(middleware.Logger)
 
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+
 	s.Router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedOrigins:   []string{frontendURL},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -56,11 +63,23 @@ func (s *Server) MountHandlers() {
 
 			// Membership inside workspace
 			r.Route("/{workspaceID}/members", func(r chi.Router) {
-				r.Post("/", s.membershipHandler.CreateMembership)
 				r.Get("/", s.membershipHandler.GetMembershipsByWorkspaceID)
 				r.Patch("/{membershipID}", s.membershipHandler.ChangeMemberRole)
 				r.Delete("/{membershipID}", s.membershipHandler.RemoveMember)
 			})
+
+			// Workspace invitations
+			r.Route("/{workspaceID}/invitations", func(r chi.Router) {
+				r.Post("/", s.invitationHandler.CreateInvitation)
+				r.Get("/", s.invitationHandler.GetInvitationsByWorkspaceID)
+				r.Post("/{invitationID}/cancel", s.invitationHandler.CancelInvitation)
+			})
+		})
+
+		// Invitations (invitee actions)
+		r.Route("/invitations", func(r chi.Router) {
+			r.Post("/{invitationID}/accept", s.invitationHandler.AcceptInvitation)
+			r.Post("/{invitationID}/decline", s.invitationHandler.DeclineInvitation)
 		})
 
 		// Boards

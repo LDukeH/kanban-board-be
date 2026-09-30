@@ -32,6 +32,7 @@ type TaskAssignedPayload struct {
 }
 
 type WorkspaceInvitedPayload struct {
+	InvitationID  uuid.UUID `json:"invitation_id"`
 	WorkspaceID   uuid.UUID `json:"workspace_id"`
 	WorkspaceName string    `json:"workspace_name"`
 	ActorEmail    string    `json:"actor_email"`

@@ -25,62 +25,6 @@ func NewHandler(membershipService *Service, userService *user.Service) *Handler 
 	}
 }
 
-func (h *Handler) CreateMembership(w http.ResponseWriter, r *http.Request) {
-	var req MembershipCreateRequest
-	workspaceIDStr := chi.URLParam(r, "workspaceID")
-	workspaceID, err := uuid.Parse(workspaceIDStr)
-	if err != nil {
-		http.Error(w, "Invalid workspace ID", http.StatusBadRequest)
-		return
-	}
-
-	userID, err := auth.GetUserID(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("ERROR decoding request body: %v\n", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if workspaceID == uuid.Nil || req.Email == "" || req.Role == "" {
-		http.Error(w, "WorkspaceID, Email and Role are required", http.StatusBadRequest)
-		return
-	}
-
-	user, err := h.userService.GetUserByEmail(r.Context(), req.Email)
-	if err != nil {
-		log.Printf("ERROR finding user: %v\n", err)
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	workspaceMembership := &WorkspaceMembership{
-		WorkspaceID: workspaceID,
-		UserID:      user.ID,
-		Role:        req.Role,
-	}
-
-	if err := h.membershipService.CreateMembership(r.Context(), workspaceMembership, userID); err != nil {
-		log.Printf("ERROR creating membership: %v\n", err)
-		apperrors.WriteError(w, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(WorkspaceMemberResponse{
-		ID:          workspaceMembership.ID,
-		WorkspaceID: workspaceMembership.WorkspaceID,
-		UserID:      workspaceMembership.UserID,
-		Role:        workspaceMembership.Role,
-		Email:       user.Email,
-	})
-}
-
 func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
 	var req ChangeRoleRequest
 	membershipIDStr := chi.URLParam(r, "membershipID")
@@ -239,4 +183,4 @@ func (h *Handler) LeaveWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}	
+}

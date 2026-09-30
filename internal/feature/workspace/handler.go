@@ -81,8 +81,15 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Omitted description stores "", preserving the previous behavior.
+	description := ""
+	if req.Description != nil {
+		description = *req.Description
+	}
+
 	workspace := Workspace{
-		Name: req.Name,
+		Name:        req.Name,
+		Description: description,
 	}
 
 	if err := h.service.CreateWorkspace(r.Context(), &workspace, userID); err != nil {
@@ -124,18 +131,20 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workspace := Workspace{
-		Name: req.Name,
-		ID:   workspaceID,
+	// Nil description leaves the stored value; an explicit "" clears it.
+	update := &WorkspaceUpdate{
+		ID:          workspaceID,
+		Name:        &req.Name,
+		Description: req.Description,
 	}
 
-	if err := h.service.UpdateWorkspace(r.Context(), workspace, userID); err != nil {
+	if err := h.service.UpdateWorkspace(r.Context(), update, userID); err != nil {
 		log.Printf("ERROR updating workspace: %v\n", err)
 		apperrors.WriteError(w, err)
 		return
 	}
 
-	// Return the updated workspace so clients can read the new name/timestamps.
+	// Return the updated workspace so clients can read the new values.
 	updated, err := h.service.GetWorkspaceByID(r.Context(), workspaceID.String(), userID)
 	if err != nil {
 		log.Printf("ERROR fetching updated workspace: %v\n", err)
@@ -188,7 +197,7 @@ func (h *Handler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	fmt.Println("Owner id:", userID);
+	fmt.Println("Owner id:", userID)
 	fmt.Println("Transfer user id:", req.NewOwnerID)
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -210,4 +219,3 @@ func (h *Handler) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-

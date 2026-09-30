@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"strings"
+
 	"kanban-board-be/internal/feature/membership"
 
 	"github.com/google/uuid"
@@ -28,12 +30,13 @@ func (r *Repository) BeginTx(ctx context.Context) (pgx.Tx, error) {
 func (r *Repository) Create(ctx context.Context, workspace *Workspace) error {
 	query :=
 		`INSERT INTO workspaces (
-			name
+			name,
+			description
 		)
-	VALUES ($1)
+	VALUES ($1, $2)
 	RETURNING id, created_at, updated_at`
 
-	return r.pool.QueryRow(ctx, query, workspace.Name).Scan(&workspace.ID, &workspace.CreatedAt, &workspace.UpdatedAt)
+	return r.pool.QueryRow(ctx, query, workspace.Name, workspace.Description).Scan(&workspace.ID, &workspace.CreatedAt, &workspace.UpdatedAt)
 }
 
 func (r *Repository) CreateTx(
@@ -43,9 +46,10 @@ func (r *Repository) CreateTx(
 ) error {
 	query := `
 		INSERT INTO workspaces (
-			name
+			name,
+			description
 		)
-		VALUES ($1)
+		VALUES ($1, $2)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -53,6 +57,7 @@ func (r *Repository) CreateTx(
 		ctx,
 		query,
 		workspace.Name,
+		workspace.Description,
 	).Scan(
 		&workspace.ID,
 		&workspace.CreatedAt,
@@ -60,12 +65,16 @@ func (r *Repository) CreateTx(
 	)
 }
 
+// Member workspaces with the caller's role and counts; subqueries avoid a cartesian product.
 func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error) {
 	query :=
 		`SELECT
 		w.id,
 		w.name,
+		w.description,
 		wm.role,
+		(SELECT COUNT(*) FROM workspace_memberships m WHERE m.workspace_id = w.id) AS member_count,
+		(SELECT COUNT(*) FROM boards b WHERE b.workspace_id = w.id) AS board_count,
 		w.created_at,
 		w.updated_at
 	FROM workspaces w
@@ -87,7 +96,10 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*Work
 		err := rows.Scan(
 			&workspace.ID,
 			&workspace.Name,
+			&workspace.Description,
 			&workspace.Role,
+			&workspace.MemberCount,
+			&workspace.BoardCount,
 			&workspace.CreatedAt,
 			&workspace.UpdatedAt,
 		)
@@ -108,6 +120,7 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Workspace, err
 		SELECT
 			id,
 			name,
+			description,
 			created_at,
 			updated_at
 		FROM workspaces
@@ -123,6 +136,7 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Workspace, err
 	).Scan(
 		&workspace.ID,
 		&workspace.Name,
+		&workspace.Description,
 		&workspace.CreatedAt,
 		&workspace.UpdatedAt,
 	)
@@ -139,6 +153,7 @@ func (r *Repository) GetList(ctx context.Context) ([]*Workspace, error) {
 		SELECT
 			id,
 			name,
+			description,
 			created_at,
 			updated_at
 		FROM workspaces
@@ -155,6 +170,7 @@ func (r *Repository) GetList(ctx context.Context) ([]*Workspace, error) {
 		err := rows.Scan(
 			&workspace.ID,
 			&workspace.Name,
+			&workspace.Description,
 			&workspace.CreatedAt,
 			&workspace.UpdatedAt,
 		)
@@ -219,15 +235,38 @@ func (r *Repository) GetMembership(
 	return membership, nil
 }
 
-func (r *Repository) UpdateWorkspace(ctx context.Context, workspace *Workspace) error {
-	query := `
-		UPDATE workspaces
-		SET name = $1,
-			updated_at = NOW()
-		WHERE id = $2
-	`
+// Partial update: only fields present in the request are written.
+func (r *Repository) UpdateWorkspace(ctx context.Context, update *WorkspaceUpdate) error {
+	var setClauses []string
+	var args []interface{}
 
-	_, err := r.pool.Exec(ctx, query, workspace.Name, workspace.ID)
+	if update.Name != nil {
+		setClauses = append(setClauses, "name = $1")
+		args = append(args, *update.Name)
+	}
+
+	if update.Description != nil {
+		setClauses = append(setClauses, fmt.Sprintf("description = $%d", len(args)+1))
+		args = append(args, *update.Description)
+	}
+
+	if len(setClauses) == 0 {
+		return nil // Nothing to update
+	}
+
+	args = append(args, update.ID) // Add the workspace ID as the last argument
+
+	query := fmt.Sprintf(`
+		UPDATE workspaces
+		SET %s,
+			updated_at = NOW()
+		WHERE id = $%d
+	`,
+		strings.Join(setClauses, ", "),
+		len(args), // The position of the workspace ID in the args slice
+	)
+
+	_, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update workspace: %w", err)
 	}

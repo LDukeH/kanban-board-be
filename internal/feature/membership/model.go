@@ -23,11 +23,6 @@ type WorkspaceMembership struct {
 	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
-type MembershipCreateRequest struct {
-	Email string        `json:"email"`
-	Role  WorkspaceRole `json:"role"`
-}
-
 type ChangeRoleRequest struct {
 	Role WorkspaceRole `json:"role"`
 }

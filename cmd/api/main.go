@@ -12,6 +12,7 @@ import (
 	"kanban-board-be/internal/feature/board"
 	"kanban-board-be/internal/feature/column"
 	"kanban-board-be/internal/feature/comment"
+	"kanban-board-be/internal/feature/invitation"
 	"kanban-board-be/internal/feature/label"
 	"kanban-board-be/internal/feature/membership"
 	"kanban-board-be/internal/feature/notification"
@@ -84,8 +85,13 @@ func main() {
 	workspaceService := workspace.NewService(workspaceRepo, membershipRepo, authzService)
 	workspaceHandler := workspace.NewHandler(workspaceService)
 
-	membershipService := membership.NewService(membershipRepo, notificationService, userService, workspaceRepo)
+	membershipService := membership.NewService(membershipRepo)
 	membershipHandler := membership.NewHandler(membershipService, userService)
+
+	// Invitation
+	invitationRepo := invitation.NewRepository(pool)
+	invitationService := invitation.NewService(invitationRepo, membershipRepo, workspaceRepo, notificationService, userService)
+	invitationHandler := invitation.NewHandler(invitationService, userService)
 
 	// Comment
 	commentService := comment.NewService(commentRepo, authzService)
@@ -96,6 +102,7 @@ func main() {
 		userHandler, authHandler, authService,
 		workspaceHandler, workspaceService,
 		membershipHandler, membershipService,
+		invitationHandler, invitationService,
 		boardHandler, boardService,
 		columnHandler, columnService,
 		taskHandler, taskService,
@@ -105,6 +112,11 @@ func main() {
 	s.MountHandlers()
 
 	// Start HTTP server
-	log.Fatal(http.ListenAndServe(":3000", s.Router))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
+log.Fatal(http.ListenAndServe(":"+port, s.Router))
 
 }
