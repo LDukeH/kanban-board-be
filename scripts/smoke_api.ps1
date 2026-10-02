@@ -187,8 +187,14 @@ Write-Output "task and label"
 $task = Step -Label "POST /columns/{id}/tasks/" -Method Post -Path "/columns/$columnAID/tasks/" -Body @{
     title       = "Smoke task"
     description = @{ type = "doc"; content = @(@{ type = "paragraph"; content = @(@{ type = "text"; text = "hello" }) }) }
+    priority    = "high"
+    due_date    = "2026-10-02"
+    completed   = $false
 } -Expected 201
 $taskID = $task.Body.id
+Assert -Condition ($task.Body.priority -eq "high") -Message "the created task returns priority high"
+Assert -Condition ($task.Body.due_date -eq "2026-10-02") -Message "the created task returns due_date 2026-10-02"
+Assert -Condition ($task.Body.completed -eq $false) -Message "the created task returns completed false"
 
 $label = Step -Label "POST /boards/{id}/labels/" -Method Post -Path "/boards/$boardID/labels/" -Body @{ name = "smoke"; color = "#4f46e5" } -Expected 201
 $labelID = $label.Body.id
@@ -205,10 +211,24 @@ $listed = @($columnTasks.Body | Where-Object { $_.id -eq $taskID })
 Assert -Condition ($listed.Count -eq 1) -Message "the task is listed in its column"
 Assert -Condition ($listed[0].labels.Count -eq 1) -Message "the task carries its aggregated labels"
 Assert -Condition ($listed[0].assignees.Count -eq 0) -Message "the task carries an empty (not null) assignee list"
+Assert -Condition ($listed[0].priority -eq "high") -Message "the listed task carries priority"
+Assert -Condition ($listed[0].due_date -eq "2026-10-02") -Message "the listed task carries due_date"
+Assert -Condition ($listed[0].completed -eq $false) -Message "the listed task carries completed"
 
 Write-Output ""
 Write-Output "mutation"
 $null = Step -Label "PATCH /tasks/{id}" -Method Patch -Path "/tasks/$taskID" -Body @{ title = "Smoke task renamed" } -Expected 204
+$null = Step -Label "PATCH /tasks/{id} (metadata)" -Method Patch -Path "/tasks/$taskID" -Body @{ priority = "low"; completed = $true } -Expected 204
+$patched = Step -Label "GET /columns/{id}/tasks/ (patched)" -Method Get -Path "/columns/$columnAID/tasks/" -Expected 200
+$patchedTask = @($patched.Body | Where-Object { $_.id -eq $taskID })[0]
+Assert -Condition ($patchedTask.priority -eq "low") -Message "the task priority updated to low"
+Assert -Condition ($patchedTask.completed -eq $true) -Message "the task completed flag updated to true"
+Assert -Condition ($patchedTask.due_date -eq "2026-10-02") -Message "an absent due_date leaves the stored date unchanged"
+$null = Step -Label "PATCH /tasks/{id} (clear due_date)" -Method Patch -Path "/tasks/$taskID" -Body @{ due_date = $null } -Expected 204
+$cleared = Step -Label "GET /columns/{id}/tasks/ (cleared)" -Method Get -Path "/columns/$columnAID/tasks/" -Expected 200
+$clearedTask = @($cleared.Body | Where-Object { $_.id -eq $taskID })[0]
+Assert -Condition ($null -eq $clearedTask.due_date) -Message "an explicit null due_date clears the stored date"
+$null = Step -Label "PATCH /tasks/{id} (bad priority)" -Method Patch -Path "/tasks/$taskID" -Body @{ priority = "urgent" } -Expected 400
 $null = Step -Label "PATCH /tasks/{id}/position (other column)" -Method Patch -Path "/tasks/$taskID/position" -Body @{ column_id = $columnBID; position = 0 } -Expected 204
 
 $moved = Step -Label "GET /columns/{id}/tasks/ (B)" -Method Get -Path "/columns/$columnBID/tasks/" -Expected 200

@@ -63,6 +63,9 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		ColumnID:    columnID,
 		Title:       req.Title,
 		Description: req.Description,
+		Priority:    req.Priority,
+		DueDate:     req.DueDate,
+		Completed:   req.Completed,
 	}
 
 	if err := h.taskService.CreateTask(r.Context(), userID, &task); err != nil {
@@ -107,6 +110,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		ID:          taskID,
 		Title:       req.Title,
 		Description: req.Description,
+		Priority:    req.Priority,
+		DueDate:     req.DueDate,
+		Completed:   req.Completed,
 	}
 
 	if err := h.taskService.UpdateTask(r.Context(), userID, &task); err != nil {

@@ -59,6 +59,9 @@ func (s *Service) CreateTask(ctx context.Context, userID uuid.UUID, task *Task) 
 	if role != membership.Owner && role != membership.Admin && role != membership.Member {
 		return apperrors.ErrForbidden
 	}
+	if task.Priority != nil && !isValidTaskPriority(*task.Priority) {
+		return fmt.Errorf("%w: invalid priority %q", apperrors.ErrValidation, *task.Priority)
+	}
 	return s.taskRepo.Create(ctx, task)
 }
 
@@ -70,6 +73,9 @@ func (s *Service) UpdateTask(ctx context.Context, userID uuid.UUID, task *Task) 
 
 	if role != membership.Owner && role != membership.Admin && role != membership.Member {
 		return apperrors.ErrForbidden
+	}
+	if task.Priority != nil && !isValidTaskPriority(*task.Priority) {
+		return fmt.Errorf("%w: invalid priority %q", apperrors.ErrValidation, *task.Priority)
 	}
 	return s.taskRepo.UpdateTask(ctx, task)
 }

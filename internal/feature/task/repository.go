@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -22,17 +23,64 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, task *Task) error {
+	// priority and completed are NOT NULL with defaults, so a nil pointer
+	// falls back to the database default via COALESCE rather than inserting
+	// NULL. due_date is nullable: absent/null on the request stays NULL.
 	query :=
 		`INSERT INTO tasks (
 			column_id,
 			title,
 			description,
-			position
+			position,
+			priority,
+			due_date,
+			completed
 		)
-		VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) + 1 FROM tasks WHERE column_id = $1), 0))
-		RETURNING id, created_at, updated_at`
+		VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) + 1 FROM tasks WHERE column_id = $1), 0), COALESCE($4, 'none'), $5, COALESCE($6, false))
+		RETURNING id, priority, due_date, completed, created_at, updated_at`
 
-	return r.pool.QueryRow(ctx, query, task.ColumnID, task.Title, task.Description).Scan(&task.ID, &task.CreatedAt, &task.UpdatedAt)
+	var dueDate any
+	if d, ok := task.DueDate.Get(); ok {
+		dueDate = d.Time
+	}
+
+	var priority string
+	var completed bool
+	var dueDateSQL *time.Time
+	err := r.pool.QueryRow(ctx, query, task.ColumnID, task.Title, task.Description, task.Priority, dueDate, task.Completed).Scan(
+		&task.ID,
+		&priority,
+		&dueDateSQL,
+		&completed,
+		&task.CreatedAt,
+		&task.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	task.Priority = &priority
+	task.Completed = &completed
+	task.DueDate = dateToOptional(dueDateSQL)
+	return nil
+}
+
+// dateToOptional converts a nullable DATE scan result into the tri-state
+// response shape: SQL NULL -> Null (JSON null), a date -> Value.
+func dateToOptional(t *time.Time) Optional[DateOnly] {
+	if t == nil {
+		return Null[DateOnly]()
+	}
+	return Some(DateOnly{Time: *t})
+}
+
+// optionalDateArg converts the tri-state request field into a driver value:
+// Value -> the calendar date, Null/Unset -> nil (NULL). Callers must only pass
+// a Set Optional (IsSet) for due_date; Unset is never rendered into SQL.
+func optionalDateArg(o Optional[DateOnly]) any {
+	if d, ok := o.Get(); ok {
+		return d.Time
+	}
+	return nil
 }
 
 func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, error) {
@@ -43,6 +91,9 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 			title,
 			description,
 			position,
+			priority,
+			due_date,
+			completed,
 			created_at,
 			updated_at
 		FROM tasks
@@ -50,18 +101,23 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 
 	row := r.pool.QueryRow(ctx, query, taskID)
 	task := &Task{}
+	var dueDateSQL *time.Time
 	err := row.Scan(
 		&task.ID,
 		&task.ColumnID,
 		&task.Title,
 		&task.Description,
 		&task.Position,
+		&task.Priority,
+		&dueDateSQL,
+		&task.Completed,
 		&task.CreatedAt,
 		&task.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan task: %w", err)
 	}
+	task.DueDate = dateToOptional(dueDateSQL)
 	return task, nil
 }
 
@@ -119,6 +175,9 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			t.title,
 			t.description,
 			t.position,
+			t.priority,
+			t.due_date,
+			t.completed,
 			t.created_at,
 			t.updated_at,
 			COALESCE(tla.labels, '[]'::json) AS labels,
@@ -143,6 +202,7 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 
 		var labelsJSON []byte
 		var assigneesJSON []byte
+		var dueDateSQL *time.Time
 
 		err := rows.Scan(
 			&task.ID,
@@ -150,6 +210,9 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			&task.Title,
 			&task.Description,
 			&task.Position,
+			&task.Priority,
+			&dueDateSQL,
+			&task.Completed,
 			&task.CreatedAt,
 			&task.UpdatedAt,
 			&labelsJSON,
@@ -158,6 +221,7 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 		if err != nil {
 			return nil, err
 		}
+		task.DueDate = dateToOptional(dueDateSQL)
 
 		if err := json.Unmarshal(labelsJSON, &task.Labels); err != nil {
 			return nil, fmt.Errorf("error unmarshalling task labels: %w", err)
@@ -178,18 +242,7 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 }
 
 func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
-	var setClauses []string
-	var args []interface{}
-
-	if task.Title != nil {
-		setClauses = append(setClauses, "title = $1")
-		args = append(args, *task.Title)
-	}
-
-	if task.Description != nil {
-		setClauses = append(setClauses, "description = $2")
-		args = append(args, *task.Description)
-	}
+	setClauses, args := buildTaskUpdateSet(task)
 	if len(setClauses) == 0 {
 		return nil // Nothing to update
 	}
@@ -216,6 +269,51 @@ func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 	}
 
 	return nil
+}
+
+// buildTaskUpdateSet renders the SET clause fragments and their arguments for
+// a partial task update. Placeholders are numbered dynamically ($1..$n) in
+// field order, and the caller appends the task ID last. A nil pointer (or an
+// Unset Optional for due_date) means "leave the column alone" and contributes
+// nothing; an explicit due_date null clears the column via SET due_date = NULL
+// with no argument. It returns no clauses when there is nothing to update.
+func buildTaskUpdateSet(task *Task) ([]string, []any) {
+	var setClauses []string
+	var args []any
+
+	addArg := func(clause string, value any) {
+		setClauses = append(setClauses, fmt.Sprintf(clause, len(args)+1))
+		args = append(args, value)
+	}
+
+	if task.Title != nil {
+		addArg("title = $%d", *task.Title)
+	}
+
+	if task.Description != nil {
+		addArg("description = $%d", *task.Description)
+	}
+
+	if task.Priority != nil {
+		addArg("priority = $%d", *task.Priority)
+	}
+
+	if task.Completed != nil {
+		addArg("completed = $%d", *task.Completed)
+	}
+
+	switch task.DueDate.State() {
+	case OptionalNull:
+		setClauses = append(setClauses, "due_date = NULL")
+	case OptionalValue:
+		if d, ok := task.DueDate.Get(); ok {
+			addArg("due_date = $%d", d.Time)
+		}
+	case OptionalUnset:
+		// Absent key: leave the stored value unchanged.
+	}
+
+	return setClauses, args
 }
 
 func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
