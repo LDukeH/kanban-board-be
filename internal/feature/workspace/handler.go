@@ -75,7 +75,8 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" {
+	name, err := normalizeWorkspaceName(req.Name)
+	if err != nil {
 		http.Error(w, "Workspace name is required", http.StatusBadRequest)
 		return
 	}
@@ -87,7 +88,7 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	workspace := Workspace{
-		Name:        req.Name,
+		Name:        name,
 		Description: description,
 	}
 
@@ -125,7 +126,8 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" {
+	name, err := normalizeWorkspaceName(req.Name)
+	if err != nil {
 		http.Error(w, "Workspace name is required", http.StatusBadRequest)
 		return
 	}
@@ -133,7 +135,7 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	// Nil description leaves the stored value; an explicit "" clears it.
 	update := &WorkspaceUpdate{
 		ID:          workspaceID,
-		Name:        &req.Name,
+		Name:        &name,
 		Description: req.Description,
 	}
 

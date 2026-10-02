@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/authz"
@@ -47,6 +48,17 @@ func validateWorkspaceDescription(description string) error {
 		return apperrors.ErrValidation
 	}
 	return nil
+}
+
+// A name made only of whitespace is not a name, so it is rejected here rather
+// than stored. Callers get the trimmed value back so a padded name never
+// round-trips with its padding.
+func normalizeWorkspaceName(name string) (string, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return "", apperrors.ErrValidation
+	}
+	return trimmed, nil
 }
 
 func (s *Service) CreateWorkspace(ctx context.Context, workspace *Workspace, userID uuid.UUID) error {
@@ -118,6 +130,12 @@ func (s *Service) UpdateWorkspace(ctx context.Context, update *WorkspaceUpdate, 
 	}
 	if role != membership.Owner {
 		return fmt.Errorf("user is not authorized to update this workspace")
+	}
+
+	if update.Name != nil {
+		if _, err := normalizeWorkspaceName(*update.Name); err != nil {
+			return err
+		}
 	}
 
 	if update.Description != nil {

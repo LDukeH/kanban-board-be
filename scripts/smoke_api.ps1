@@ -223,10 +223,9 @@ Assert -Condition ($unknownTask.Status -eq 403) -Message "an unknown task answer
 $unknownBoard = Step -Label "GET /boards/{unknown}" -Method Get -Path "/boards/$random" -Expected 404
 Assert -Condition ($unknownBoard.Status -eq 404) -Message "an unknown board answers 404"
 
-# Informational: the live frontend suite expects 400 here because the frontend
-# trims and rejects a blank name; the API itself only rejects an empty string.
-$blankName = Invoke-Api -Method Patch -Path "/workspaces/$workspaceID" -Body @{ name = "   "; description = "Platform roadmap" }
-Write-Host ("  [info] PATCH /workspaces/<id> with a blank name -> {0} ({1} ms)" -f $blankName.Status, $blankName.Ms)
+# A whitespace-only name is a bad request, matching the frontend's own rule.
+$blankName = Step -Label "PATCH /workspaces/{id} (blank name)" -Method Patch -Path "/workspaces/$workspaceID" -Body @{ name = "   "; description = "Platform roadmap" } -Expected 400
+Assert -Condition ($blankName.Status -eq 400) -Message "a whitespace-only workspace name answers 400"
 
 Write-Output ""
 Write-Output "cleanup"
