@@ -125,11 +125,14 @@ jobs:
         run: go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
       - name: Validate migration files (no database required)
         run: goose -dir ./migrations validate
+      # GOOSE_DRIVER and GOOSE_DBSTRING are set in this job's env block.
+      # When they are, goose takes NO positional driver argument - passing
+      # one makes goose read "postgres" as the command name.
       - name: Apply all migrations in order
         # These migrations are Up-only, so this never runs `down`.
-        run: goose -dir ./migrations postgres "$GOOSE_DBSTRING" up
+        run: goose -dir ./migrations up
       - name: Verify applied state
-        run: goose -dir ./migrations postgres "$GOOSE_DBSTRING" status
+        run: goose -dir ./migrations status
       - name: Schema sanity check
         run: |
           psql "$GOOSE_DBSTRING" -v ON_ERROR_STOP=1 -c \

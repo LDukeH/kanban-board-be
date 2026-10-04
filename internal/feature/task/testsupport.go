@@ -1,4 +1,5 @@
 package task
+
 func BuildTaskUpdateSet(task *Task) ([]string, []any) {
 	return buildTaskUpdateSet(task)
 }
