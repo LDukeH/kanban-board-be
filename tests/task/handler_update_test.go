@@ -1,4 +1,4 @@
-package task
+package task_test
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kanban-board-be/internal/feature/membership"
+	. "kanban-board-be/internal/feature/task"
 
 	"github.com/google/uuid"
 )
@@ -32,7 +33,7 @@ func TestHandlerUpdateTaskDueDateNullClears(t *testing.T) {
 		t.Fatalf("due_date state = %v, want OptionalNull", repo.lastUpdated.DueDate.State())
 	}
 	// Only due_date was sent: no other field may render into the SET clause.
-	if clauses, _ := buildTaskUpdateSet(repo.lastUpdated); len(clauses) != 1 || clauses[0] != "due_date = NULL" {
+	if clauses, _ := BuildTaskUpdateSet(repo.lastUpdated); len(clauses) != 1 || clauses[0] != "due_date = NULL" {
 		t.Fatalf("clauses = %v, want [due_date = NULL]", clauses)
 	}
 }

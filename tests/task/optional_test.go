@@ -1,9 +1,11 @@
-package task
+package task_test
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	. "kanban-board-be/internal/feature/task"
 )
 
 func mustParseDate(t *testing.T, s string) DateOnly {

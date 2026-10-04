@@ -14,7 +14,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type taskRepository interface {
+// TaskRepository is the storage contract the task service depends on. It is
+// exported so an external test package can declare helpers against it; the
+// concrete repository satisfies it structurally.
+type TaskRepository interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	Create(ctx context.Context, task *Task) error
 	UpdateTask(ctx context.Context, task *Task) error
@@ -29,14 +32,14 @@ type taskRepository interface {
 }
 
 type Service struct {
-	taskRepo            taskRepository
+	taskRepo            TaskRepository
 	authz               *authz.Service
 	notificationService *notification.Service
 	userService         *user.Service
 }
 
 func NewService(
-	taskRepo taskRepository,
+	taskRepo TaskRepository,
 	authz *authz.Service,
 	notificationService *notification.Service,
 	userService *user.Service,

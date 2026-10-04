@@ -1,0 +1,136 @@
+name: Backend CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: Format (gofmt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l . || true)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt-formatted:"
+            echo "$unformatted"
+            gofmt -d $unformatted
+            exit 1
+          fi
+          echo "gofmt: all files formatted"
+
+  vet:
+    name: Static analysis (go vet)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go vet
+        run: go vet ./...
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go test
+        run: |
+          go test -race -count=1 \
+            -covermode=atomic \
+            -coverpkg ./internal/... \
+            -coverprofile coverage.out \
+            ./...
+      - name: Coverage report (informational only, never fails the build)
+        if: always()
+        run: |
+          if [ -f coverage.out ]; then
+            echo "Coverage is reported for visibility only - no threshold is enforced."
+            echo "Only the task feature has a test suite today, so the global"
+            echo "number is low by construction; see the per-function detail below."
+            go tool cover -func coverage.out
+          else
+            echo "No coverage.out was produced (the test step failed before writing it)."
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ github.run_id }}
+          path: coverage.out
+          retention-days: 7
+
+  build:
+    name: Build (linux/amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build static binary
+        run: CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ./bin/main ./cmd/api
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kanban-api-${{ github.sha }}
+          path: bin/main
+          retention-days: 7
+
+  migrations:
+    name: Migrations (goose)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kanban_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d kanban_ci"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: postgres://postgres:postgres@localhost:5432/kanban_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
+      - name: Validate migration files (no database required)
+        run: goose -dir ./migrations validate
+      - name: Apply all migrations in order
+        # These migrations are Up-only, so this never runs `down`.
+        run: goose -dir ./migrations postgres "$GOOSE_DBSTRING" up
+      - name: Verify applied state
+        run: goose -dir ./migrations postgres "$GOOSE_DBSTRING" status
+      - name: Schema sanity check
+        run: |
+          psql "$GOOSE_DBSTRING" -v ON_ERROR_STOP=1 -c \
+            "select version_id, is_applied from goose_db_version order by id;"

@@ -1,4 +1,4 @@
-package task
+package task_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 
 	"kanban-board-be/internal/feature/auth"
 	"kanban-board-be/internal/feature/membership"
+	. "kanban-board-be/internal/feature/task"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+*.go  text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+
+# PowerShell scripts stay CRLF so they run correctly on Windows.
+*.ps1 text eol=crlf

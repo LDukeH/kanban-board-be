@@ -1,4 +1,4 @@
-package task
+package task_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"kanban-board-be/internal/feature/membership"
+	. "kanban-board-be/internal/feature/task"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -111,7 +112,7 @@ func (s stubResolver) GetLabelRole(ctx context.Context, userID, labelID uuid.UUI
 	return uuid.Nil, s.role, s.err
 }
 
-func serviceWithRole(t *testing.T, repo taskRepository, role membership.WorkspaceRole, err error) *Service {
+func serviceWithRole(t *testing.T, repo TaskRepository, role membership.WorkspaceRole, err error) *Service {
 	t.Helper()
 	authzSvc := newAuthzServiceForTest(t, stubResolver{role: role, err: err})
 	return NewService(repo, authzSvc, nil, nil)

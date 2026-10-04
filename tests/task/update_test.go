@@ -1,9 +1,11 @@
-package task
+package task_test
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	. "kanban-board-be/internal/feature/task"
 )
 
 func strp(s string) *string { return &s }
@@ -18,7 +20,7 @@ func datep(t *testing.T, s string) Optional[DateOnly] {
 }
 
 func TestBuildTaskUpdateSetEmpty(t *testing.T) {
-	clauses, args := buildTaskUpdateSet(&Task{})
+	clauses, args := BuildTaskUpdateSet(&Task{})
 	if len(clauses) != 0 {
 		t.Fatalf("clauses = %v, want none", clauses)
 	}
@@ -31,7 +33,7 @@ func TestBuildTaskUpdateSetLegacyFieldsRenumber(t *testing.T) {
 	// Old code hardcoded description to $2; with only description set the
 	// placeholder must be $1 now.
 	desc := jsonRaw(`{"type":"doc","content":[]}`)
-	clauses, args := buildTaskUpdateSet(&Task{Description: &desc})
+	clauses, args := BuildTaskUpdateSet(&Task{Description: &desc})
 	if len(clauses) != 1 || clauses[0] != "description = $1" {
 		t.Fatalf("clauses = %v, want [description = $1]", clauses)
 	}
@@ -41,7 +43,7 @@ func TestBuildTaskUpdateSetLegacyFieldsRenumber(t *testing.T) {
 }
 
 func TestBuildTaskUpdateSetTitleOnlyKeepsLegacyNumbering(t *testing.T) {
-	clauses, _ := buildTaskUpdateSet(&Task{Title: strp("renamed")})
+	clauses, _ := BuildTaskUpdateSet(&Task{Title: strp("renamed")})
 	if len(clauses) != 1 || clauses[0] != "title = $1" {
 		t.Fatalf("clauses = %v, want [title = $1]", clauses)
 	}
@@ -57,7 +59,7 @@ func TestBuildTaskUpdateSetAllFields(t *testing.T) {
 		Completed:   boolp(completed),
 		DueDate:     datep(t, "2026-10-02"),
 	}
-	clauses, args := buildTaskUpdateSet(task)
+	clauses, args := BuildTaskUpdateSet(task)
 
 	want := []string{
 		"title = $1",
@@ -76,7 +78,7 @@ func TestBuildTaskUpdateSetAllFields(t *testing.T) {
 
 func TestBuildTaskUpdateSetDueDateClearEmitsNoArg(t *testing.T) {
 	task := &Task{DueDate: Null[DateOnly]()}
-	clauses, args := buildTaskUpdateSet(task)
+	clauses, args := BuildTaskUpdateSet(task)
 	if len(clauses) != 1 || clauses[0] != "due_date = NULL" {
 		t.Fatalf("clauses = %v, want [due_date = NULL]", clauses)
 	}
@@ -87,7 +89,7 @@ func TestBuildTaskUpdateSetDueDateClearEmitsNoArg(t *testing.T) {
 
 func TestBuildTaskUpdateSetDueDateAbsentEmitsNothing(t *testing.T) {
 	task := &Task{Title: strp("t"), DueDate: Unset[DateOnly]()}
-	clauses, args := buildTaskUpdateSet(task)
+	clauses, args := BuildTaskUpdateSet(task)
 	if len(clauses) != 1 || clauses[0] != "title = $1" {
 		t.Fatalf("clauses = %v, want [title = $1]", clauses)
 	}
@@ -99,7 +101,7 @@ func TestBuildTaskUpdateSetDueDateAbsentEmitsNothing(t *testing.T) {
 func TestBuildTaskUpdateSetCompletedFalseIsAnUpdate(t *testing.T) {
 	// A false pointer must still render: completed=false is a real write.
 	task := &Task{Completed: boolp(false)}
-	clauses, args := buildTaskUpdateSet(task)
+	clauses, args := BuildTaskUpdateSet(task)
 	if len(clauses) != 1 || clauses[0] != "completed = $1" {
 		t.Fatalf("clauses = %v, want [completed = $1]", clauses)
 	}
@@ -110,12 +112,12 @@ func TestBuildTaskUpdateSetCompletedFalseIsAnUpdate(t *testing.T) {
 
 func TestIsValidTaskPriority(t *testing.T) {
 	for _, p := range []string{PriorityNone, PriorityLow, PriorityMedium, PriorityHigh} {
-		if !isValidTaskPriority(p) {
+		if !IsValidTaskPriority(p) {
 			t.Fatalf("priority %q rejected, want accepted", p)
 		}
 	}
 	for _, p := range []string{"", "urgent", "HIGH", " none", "none "} {
-		if isValidTaskPriority(p) {
+		if IsValidTaskPriority(p) {
 			t.Fatalf("priority %q accepted, want rejected", p)
 		}
 	}

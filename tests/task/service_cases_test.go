@@ -1,4 +1,4 @@
-package task
+package task_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/membership"
+	. "kanban-board-be/internal/feature/task"
 
 	"github.com/google/uuid"
 )
