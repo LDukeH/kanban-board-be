@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/auth"
@@ -160,6 +161,19 @@ func (h *Handler) UpdateTaskPosition(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// taskVersionFromQuery reads ?version=, 0 when absent or invalid.
+func taskVersionFromQuery(r *http.Request) int {
+	raw := r.URL.Query().Get("version")
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	userID, err := auth.GetUserID(r)
 	if err != nil {
@@ -174,7 +188,7 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.taskService.DeleteTask(r.Context(), userID, taskID); err != nil {
+	if err := h.taskService.DeleteTask(r.Context(), userID, taskID, taskVersionFromQuery(r)); err != nil {
 		log.Printf("ERROR: Failed to delete task: %v", err)
 		apperrors.WriteError(w, err)
 		return

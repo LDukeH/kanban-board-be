@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,8 +17,8 @@ const (
 
 	// Each serverless instance is short-lived and Supabase's pooler enforces a
 	// hard client limit, so keep the per-instance footprint deliberately small.
-	maxConns = 4
-	minConns = 1
+	maxConns = 2
+	minConns = 0
 )
 
 // NewPostgresPool parses DATABASE_URL into a bounded pgx pool with explicit
@@ -40,6 +41,7 @@ func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	cfg.HealthCheckPeriod = time.Minute
 	cfg.ConnConfig.ConnectTimeout = connectTimeout
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
@@ -47,8 +49,6 @@ func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
 	}
 
 	// Ping with a deadline so the handshake cannot exceed connectTimeout. A
-	// failed ping is logged rather than fatal: the pool dials lazily and the
-	// first real query is bounded by its request context anyway.
 	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 

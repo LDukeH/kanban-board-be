@@ -7,3 +7,8 @@ func BuildTaskUpdateSet(task *Task) ([]string, []any) {
 func IsValidTaskPriority(p string) bool {
 	return isValidTaskPriority(p)
 }
+
+// ClassifyVersionMismatch exposes the mapping for tests.
+func ClassifyVersionMismatch(exists bool) error {
+	return classifyVersionMismatch(exists)
+}

@@ -3,17 +3,29 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"kanban-board-be/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// db is the slice of *pgxpool.Pool this repository uses, so tests can inject a mock.
+type db interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type Repository struct {
-	pool *pgxpool.Pool
+	pool db
 }
 
 func NewRepository(pool *pgxpool.Pool) *Repository {
@@ -22,10 +34,39 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
+// NewRepositoryWithDB builds a repository over any db implementation, for tests.
+func NewRepositoryWithDB(pool db) *Repository {
+	return &Repository{pool: pool}
+}
+
+// classifyVersionMismatch splits "matched no rows" into conflict or not found.
+func classifyVersionMismatch(exists bool) error {
+	if exists {
+		return apperrors.ErrConflict
+	}
+	return apperrors.ErrNotFound
+}
+
+// taskExists reports whether the task row is still present.
+func taskExists(ctx context.Context, q db, taskID uuid.UUID) (bool, error) {
+	var exists bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tasks WHERE id = $1)`, taskID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check task existence: %w", err)
+	}
+	return exists, nil
+}
+
+// resolveVersionMismatch returns the error to propagate, so the caller rolls back.
+func resolveVersionMismatch(ctx context.Context, q db, taskID uuid.UUID) error {
+	exists, err := taskExists(ctx, q, taskID)
+	if err != nil {
+		return err
+	}
+	return classifyVersionMismatch(exists)
+}
+
 func (r *Repository) Create(ctx context.Context, task *Task) error {
-	// priority and completed are NOT NULL with defaults, so a nil pointer
-	// falls back to the database default via COALESCE rather than inserting
-	// NULL. due_date is nullable: absent/null on the request stays NULL.
 	query :=
 		`INSERT INTO tasks (
 			column_id,
@@ -37,7 +78,7 @@ func (r *Repository) Create(ctx context.Context, task *Task) error {
 			completed
 		)
 		VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) + 1 FROM tasks WHERE column_id = $1), 0), COALESCE($4, 'none'), $5, COALESCE($6, false))
-		RETURNING id, priority, due_date, completed, created_at, updated_at`
+		RETURNING id, priority, due_date, completed, version, created_at, updated_at`
 
 	var dueDate any
 	if d, ok := task.DueDate.Get(); ok {
@@ -52,6 +93,7 @@ func (r *Repository) Create(ctx context.Context, task *Task) error {
 		&priority,
 		&dueDateSQL,
 		&completed,
+		&task.Version,
 		&task.CreatedAt,
 		&task.UpdatedAt,
 	)
@@ -64,8 +106,6 @@ func (r *Repository) Create(ctx context.Context, task *Task) error {
 	return nil
 }
 
-// dateToOptional converts a nullable DATE scan result into the tri-state
-// response shape: SQL NULL -> Null (JSON null), a date -> Value.
 func dateToOptional(t *time.Time) Optional[DateOnly] {
 	if t == nil {
 		return Null[DateOnly]()
@@ -73,9 +113,6 @@ func dateToOptional(t *time.Time) Optional[DateOnly] {
 	return Some(DateOnly{Time: *t})
 }
 
-// optionalDateArg converts the tri-state request field into a driver value:
-// Value -> the calendar date, Null/Unset -> nil (NULL). Callers must only pass
-// a Set Optional (IsSet) for due_date; Unset is never rendered into SQL.
 func optionalDateArg(o Optional[DateOnly]) any {
 	if d, ok := o.Get(); ok {
 		return d.Time
@@ -94,6 +131,7 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 			priority,
 			due_date,
 			completed,
+			version,
 			created_at,
 			updated_at
 		FROM tasks
@@ -111,6 +149,7 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 		&task.Priority,
 		&dueDateSQL,
 		&task.Completed,
+		&task.Version,
 		&task.CreatedAt,
 		&task.UpdatedAt,
 	)
@@ -121,13 +160,6 @@ func (r *Repository) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, erro
 	return task, nil
 }
 
-// GetByColumnID returns the column's tasks oldest-position first, each with its
-// labels and assignees.
-//
-// The labels and assignees are aggregated once per column in CTEs and joined
-// onto the task rows. The previous shape attached a json_agg subquery for each
-// relation to every task row, so the planner built 2N correlated subplans: one
-// index scan per task per relation even though all tasks share one column.
 func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error) {
 	query := `
 		WITH column_tasks AS (
@@ -178,6 +210,7 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			t.priority,
 			t.due_date,
 			t.completed,
+			t.version,
 			t.created_at,
 			t.updated_at,
 			COALESCE(tla.labels, '[]'::json) AS labels,
@@ -213,6 +246,7 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 			&task.Priority,
 			&dueDateSQL,
 			&task.Completed,
+			&task.Version,
 			&task.CreatedAt,
 			&task.UpdatedAt,
 			&labelsJSON,
@@ -241,22 +275,28 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 	return tasks, nil
 }
 
+// UpdateTask applies a partial update guarded by the client's version.
 func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 	setClauses, args := buildTaskUpdateSet(task)
 	if len(setClauses) == 0 {
-		return nil // Nothing to update
+		// An empty patch still has to honour the guard.
+		return r.guardVersion(ctx, task)
 	}
 
-	args = append(args, task.ID) // Add the task ID as the last argument
+	args = append(args, task.ID)      // The task ID
+	args = append(args, task.Version) // The version the client read
 
 	query := fmt.Sprintf(`
 		UPDATE tasks
 		SET %s,
+			version = version + 1,
 			updated_at = NOW()
 		WHERE id = $%d
+		  AND version = $%d
 	`,
 		strings.Join(setClauses, ", "),
-		len(args), // The position of the task ID in the args slice
+		len(args)-1, // The position of the task ID in the args slice
+		len(args),   // The position of the version in the args slice
 	)
 
 	result, err := r.pool.Exec(ctx, query, args...)
@@ -265,18 +305,29 @@ func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no task found with ID %s", task.ID)
+		return resolveVersionMismatch(ctx, r.pool, task.ID)
 	}
 
+	task.Version++
 	return nil
 }
 
-// buildTaskUpdateSet renders the SET clause fragments and their arguments for
-// a partial task update. Placeholders are numbered dynamically ($1..$n) in
-// field order, and the caller appends the task ID last. A nil pointer (or an
-// Unset Optional for due_date) means "leave the column alone" and contributes
-// nothing; an explicit due_date null clears the column via SET due_date = NULL
-// with no argument. It returns no clauses when there is nothing to update.
+// guardVersion checks the version without writing, for a patch with no fields.
+func (r *Repository) guardVersion(ctx context.Context, task *Task) error {
+	var current int
+	err := r.pool.QueryRow(ctx, `SELECT version FROM tasks WHERE id = $1`, task.ID).Scan(&current)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.ErrNotFound
+		}
+		return fmt.Errorf("failed to read task version: %w", err)
+	}
+	if current != task.Version {
+		return apperrors.ErrConflict
+	}
+	return nil
+}
+
 func buildTaskUpdateSet(task *Task) ([]string, []any) {
 	var setClauses []string
 	var args []any
@@ -316,6 +367,7 @@ func buildTaskUpdateSet(task *Task) ([]string, []any) {
 	return setClauses, args
 }
 
+// UpdateTaskPosition moves a task, checking only the moved task's version.
 func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 	tx, err := r.pool.Begin(ctx)
 
@@ -340,6 +392,9 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 		&currentTask.Position,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.ErrNotFound
+		}
 		return fmt.Errorf("failed to get current task: %w", err)
 	}
 
@@ -362,7 +417,8 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 				`
 					UPDATE tasks
 					SET position = position - 1,
-						updated_at = NOW()
+					    version = version + 1,
+					    updated_at = NOW()
 					WHERE column_id = $1
 					  AND position > $2
 					  AND position <= $3
@@ -377,7 +433,8 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 				`
 					UPDATE tasks
 					SET position = position + 1,
-						updated_at = NOW()
+					    version = version + 1,
+					    updated_at = NOW()
 					WHERE column_id = $1
 					  AND position >= $2
 					  AND position < $3
@@ -397,7 +454,8 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 			`
 				UPDATE tasks
 				SET position = position - 1,
-					updated_at = NOW()
+				    version = version + 1,
+				    updated_at = NOW()
 				WHERE column_id = $1
 				  AND position > $2
 			`,
@@ -414,7 +472,8 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 			`
 				UPDATE tasks
 				SET position = position + 1,
-					updated_at = NOW()
+				    version = version + 1,
+				    updated_at = NOW()
 				WHERE column_id = $1
 				  AND position >= $2
 			`,
@@ -426,32 +485,42 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 		}
 	}
 
-	// Move target task (update position and optionally column_id)
-	_, err = tx.Exec(
+	// Move the target task, the one row whose version the client asserted on.
+	result, err := tx.Exec(
 		ctx,
 		`
 			UPDATE tasks
 			SET position = $1,
 				column_id = $2,
+				version = version + 1,
 				updated_at = NOW()
 			WHERE id = $3
+			  AND version = $4
 		`,
 		newPosition,
 		targetColumnID,
 		task.ID,
+		task.Version,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update task position: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		// Returning here rolls the shifts above back.
+		return resolveVersionMismatch(ctx, tx, task.ID)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit task move: %w", err)
 	}
 
+	task.Version++
 	return nil
 }
 
-func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID) error {
+// DeleteTask removes a task guarded by the client's version and closes the gap.
+func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID, version int) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -473,20 +542,29 @@ func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID) error {
 	).Scan(&columnID, &position)
 
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.ErrNotFound
+		}
 		return fmt.Errorf("failed to get task before deletion: %w", err)
 	}
 
-	// Delete the task
-	_, err = tx.Exec(
+	// Delete the task, guarded by the version the client read
+	result, err := tx.Exec(
 		ctx,
 		`
 		DELETE FROM tasks
 		WHERE id = $1
+		  AND version = $2
 		`,
 		taskID,
+		version,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return resolveVersionMismatch(ctx, tx, taskID)
 	}
 
 	// Shift other tasks' positions
@@ -495,6 +573,7 @@ func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID) error {
 		`
 		UPDATE tasks
 		SET position = position - 1,
+		    version = version + 1,
 		    updated_at = NOW()
 		WHERE column_id = $1
 		  AND position > $2

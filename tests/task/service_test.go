@@ -59,7 +59,7 @@ func (f *fakeTaskRepo) UpdateTaskPosition(ctx context.Context, task *Task) error
 	return nil
 }
 
-func (f *fakeTaskRepo) DeleteTask(ctx context.Context, taskID uuid.UUID) error {
+func (f *fakeTaskRepo) DeleteTask(ctx context.Context, taskID uuid.UUID, version int) error {
 	if f.deleteErr != nil {
 		return f.deleteErr
 	}

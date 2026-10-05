@@ -14,16 +14,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// TaskRepository is the storage contract the task service depends on. It is
-// exported so an external test package can declare helpers against it; the
-// concrete repository satisfies it structurally.
 type TaskRepository interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	Create(ctx context.Context, task *Task) error
 	UpdateTask(ctx context.Context, task *Task) error
 	GetByID(ctx context.Context, taskID uuid.UUID) (*Task, error)
 	UpdateTaskPosition(ctx context.Context, task *Task) error
-	DeleteTask(ctx context.Context, taskID uuid.UUID) error
+	DeleteTask(ctx context.Context, taskID uuid.UUID, version int) error
 	GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*Task, error)
 	AssignUserToTaskTx(ctx context.Context, tx pgx.Tx, taskID uuid.UUID, userID uuid.UUID) error
 	RemoveUserFromTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
@@ -123,7 +120,7 @@ func (s *Service) UpdateTaskPosition(ctx context.Context, userID uuid.UUID, task
 	return s.taskRepo.UpdateTaskPosition(ctx, task)
 }
 
-func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID) error {
+func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.UUID, version int) error {
 	role, err := s.authz.GetTaskRole(ctx, userID, taskID)
 	if err != nil {
 		return err
@@ -133,7 +130,7 @@ func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.
 		return apperrors.ErrForbidden
 	}
 
-	return s.taskRepo.DeleteTask(ctx, taskID)
+	return s.taskRepo.DeleteTask(ctx, taskID, version)
 }
 
 func (s *Service) GetTasksByColumnID(ctx context.Context, columnID uuid.UUID, userID uuid.UUID) ([]*Task, error) {

@@ -87,7 +87,7 @@ func TestServiceMemberCannotDeleteTask(t *testing.T) {
 	repo := &fakeTaskRepo{}
 	svc := serviceWithRole(t, repo, membership.Member, nil)
 
-	err := svc.DeleteTask(context.Background(), uuid.New(), uuid.New())
+	err := svc.DeleteTask(context.Background(), uuid.New(), uuid.New(), 1)
 	if !errors.Is(err, apperrors.ErrForbidden) {
 		t.Fatalf("err = %v, want ErrForbidden", err)
 	}
@@ -101,7 +101,7 @@ func TestServiceOwnerCanDeleteTask(t *testing.T) {
 	svc := serviceWithRole(t, repo, membership.Owner, nil)
 
 	taskID := uuid.New()
-	if err := svc.DeleteTask(context.Background(), uuid.New(), taskID); err != nil {
+	if err := svc.DeleteTask(context.Background(), uuid.New(), taskID, 1); err != nil {
 		t.Fatalf("Owner DeleteTask: %v", err)
 	}
 	if len(repo.deleted) != 1 || repo.deleted[0] != taskID {
