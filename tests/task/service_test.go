@@ -13,14 +13,17 @@ import (
 )
 
 type fakeTaskRepo struct {
-	created   []*Task
-	updated   []*Task
-	deleted   []uuid.UUID
-	createErr error
-	updateErr error
-	deleteErr error
-	byID      map[uuid.UUID]*Task
-	byIDErr   error
+	created     []*Task
+	updated     []*Task
+	moved       []*Task
+	deleted     []uuid.UUID
+	deletedVer  []int
+	createErr   error
+	updateErr   error
+	positionErr error
+	deleteErr   error
+	byID        map[uuid.UUID]*Task
+	byIDErr     error
 }
 
 func (f *fakeTaskRepo) BeginTx(ctx context.Context) (pgx.Tx, error) {
@@ -56,6 +59,10 @@ func (f *fakeTaskRepo) GetByID(ctx context.Context, taskID uuid.UUID) (*Task, er
 }
 
 func (f *fakeTaskRepo) UpdateTaskPosition(ctx context.Context, task *Task) error {
+	if f.positionErr != nil {
+		return f.positionErr
+	}
+	f.moved = append(f.moved, task)
 	return nil
 }
 
@@ -64,6 +71,7 @@ func (f *fakeTaskRepo) DeleteTask(ctx context.Context, taskID uuid.UUID, version
 		return f.deleteErr
 	}
 	f.deleted = append(f.deleted, taskID)
+	f.deletedVer = append(f.deletedVer, version)
 	return nil
 }
 

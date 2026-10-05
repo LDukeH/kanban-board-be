@@ -29,7 +29,7 @@ func (h *handlerRepo) Create(ctx context.Context, task *Task) error {
 
 func (h *handlerRepo) UpdateTask(ctx context.Context, task *Task) error {
 	h.lastUpdated = task
-	return nil
+	return h.updateErr
 }
 
 func handlerWithRole(t *testing.T, repo *handlerRepo, role membership.WorkspaceRole, err error) *Handler {
