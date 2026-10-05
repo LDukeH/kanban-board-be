@@ -28,6 +28,15 @@ type TaskRepository interface {
 	GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]*UsersTaskResponse, error)
 }
 
+// validateVersion rejects a missing or non-positive version with ErrValidation,
+// which the handler maps to 400.
+func validateVersion(version int) error {
+	if version < 1 {
+		return fmt.Errorf("%w: version must be a positive integer", apperrors.ErrValidation)
+	}
+	return nil
+}
+
 type Service struct {
 	taskRepo            TaskRepository
 	authz               *authz.Service
@@ -74,6 +83,9 @@ func (s *Service) UpdateTask(ctx context.Context, userID uuid.UUID, task *Task) 
 	if role != membership.Owner && role != membership.Admin && role != membership.Member {
 		return apperrors.ErrForbidden
 	}
+	if err := validateVersion(task.Version); err != nil {
+		return err
+	}
 	if task.Priority != nil && !isValidTaskPriority(*task.Priority) {
 		return fmt.Errorf("%w: invalid priority %q", apperrors.ErrValidation, *task.Priority)
 	}
@@ -95,6 +107,10 @@ func (s *Service) UpdateTaskPosition(ctx context.Context, userID uuid.UUID, task
 
 	if role != membership.Owner && role != membership.Admin && role != membership.Member {
 		return apperrors.ErrForbidden
+	}
+
+	if err := validateVersion(task.Version); err != nil {
+		return err
 	}
 
 	// Nothing to validate if the task stays in the same column.
@@ -128,6 +144,10 @@ func (s *Service) DeleteTask(ctx context.Context, userID uuid.UUID, taskID uuid.
 
 	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
+	}
+
+	if err := validateVersion(version); err != nil {
+		return err
 	}
 
 	return s.taskRepo.DeleteTask(ctx, taskID, version)

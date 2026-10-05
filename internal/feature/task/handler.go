@@ -107,6 +107,11 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Version == nil {
+		http.Error(w, "Task version is required", http.StatusBadRequest)
+		return
+	}
+
 	task := Task{
 		ID:          taskID,
 		Title:       req.Title,
@@ -114,6 +119,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		Priority:    req.Priority,
 		DueDate:     req.DueDate,
 		Completed:   req.Completed,
+		Version:     *req.Version,
 	}
 
 	if err := h.taskService.UpdateTask(r.Context(), userID, &task); err != nil {
@@ -122,7 +128,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(task)
 }
 
 func (h *Handler) UpdateTaskPosition(w http.ResponseWriter, r *http.Request) {
@@ -146,10 +154,16 @@ func (h *Handler) UpdateTaskPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Version == nil {
+		http.Error(w, "Task version is required", http.StatusBadRequest)
+		return
+	}
+
 	task := Task{
 		ID:       taskID,
 		ColumnID: req.ColumnID,
 		Position: req.Position,
+		Version:  *req.Version,
 	}
 
 	if err := h.taskService.UpdateTaskPosition(r.Context(), userID, &task); err != nil {
@@ -158,20 +172,19 @@ func (h *Handler) UpdateTaskPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(task)
 }
 
-// taskVersionFromQuery reads ?version=, 0 when absent or invalid.
-func taskVersionFromQuery(r *http.Request) int {
+// taskVersionFromQuery parses ?version=, reporting whether it is valid.
+func taskVersionFromQuery(r *http.Request) (int, bool) {
 	raw := r.URL.Query().Get("version")
-	if raw == "" {
-		return 0
-	}
 	v, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0
+	if raw == "" || err != nil || v < 1 {
+		return 0, false
 	}
-	return v
+	return v, true
 }
 
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +201,13 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.taskService.DeleteTask(r.Context(), userID, taskID, taskVersionFromQuery(r)); err != nil {
+	version, ok := taskVersionFromQuery(r)
+	if !ok {
+		http.Error(w, "Task version is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.taskService.DeleteTask(r.Context(), userID, taskID, version); err != nil {
 		log.Printf("ERROR: Failed to delete task: %v", err)
 		apperrors.WriteError(w, err)
 		return

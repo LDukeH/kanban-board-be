@@ -17,14 +17,14 @@ func TestHandlerUpdateTaskDueDateNullClears(t *testing.T) {
 	h := handlerWithRole(t, repo, membership.Member, nil)
 
 	taskID := uuid.New()
-	body := []byte(`{"due_date":null}`)
+	body := []byte(`{"due_date":null,"version":1}`)
 
 	req := withChiParam(requestWithUser(http.MethodPatch, "/", body, uuid.New()), "taskID", taskID.String())
 	rec := httptest.NewRecorder()
 	h.UpdateTask(rec, req)
 
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204. body: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200. body: %s", rec.Code, rec.Body.String())
 	}
 	if repo.lastUpdated == nil {
 		t.Fatal("service was never called")
@@ -43,14 +43,14 @@ func TestHandlerUpdateTaskDueDateAbsentLeavesUnchanged(t *testing.T) {
 	h := handlerWithRole(t, repo, membership.Member, nil)
 
 	taskID := uuid.New()
-	body := []byte(`{"title":"renamed"}`)
+	body := []byte(`{"title":"renamed","version":1}`)
 
 	req := withChiParam(requestWithUser(http.MethodPatch, "/", body, uuid.New()), "taskID", taskID.String())
 	rec := httptest.NewRecorder()
 	h.UpdateTask(rec, req)
 
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204. body: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200. body: %s", rec.Code, rec.Body.String())
 	}
 	if repo.lastUpdated == nil {
 		t.Fatal("service was never called")
@@ -65,14 +65,14 @@ func TestHandlerUpdateTaskDueDateValueSets(t *testing.T) {
 	h := handlerWithRole(t, repo, membership.Member, nil)
 
 	taskID := uuid.New()
-	body := []byte(`{"due_date":"2026-12-31"}`)
+	body := []byte(`{"due_date":"2026-12-31","version":1}`)
 
 	req := withChiParam(requestWithUser(http.MethodPatch, "/", body, uuid.New()), "taskID", taskID.String())
 	rec := httptest.NewRecorder()
 	h.UpdateTask(rec, req)
 
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204. body: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200. body: %s", rec.Code, rec.Body.String())
 	}
 	if repo.lastUpdated == nil {
 		t.Fatal("service was never called")
@@ -126,7 +126,7 @@ func TestHandlerMemberForbiddenSurfaces403(t *testing.T) {
 	h := NewHandler(svc, nil, nil)
 
 	taskID := uuid.New()
-	body := []byte(`{"title":"nope"}`)
+	body := []byte(`{"title":"nope","version":1}`)
 
 	req := withChiParam(requestWithUser(http.MethodPatch, "/", body, uuid.New()), "taskID", taskID.String())
 	rec := httptest.NewRecorder()

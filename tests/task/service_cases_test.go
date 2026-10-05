@@ -74,7 +74,7 @@ func TestServiceMemberCanUpdateMetadata(t *testing.T) {
 	repo := &fakeTaskRepo{}
 	svc := serviceWithRole(t, repo, membership.Member, nil)
 
-	task := &Task{ID: uuid.New(), Priority: strp(PriorityLow), Completed: boolp(true)}
+	task := &Task{ID: uuid.New(), Priority: strp(PriorityLow), Completed: boolp(true), Version: 1}
 	if err := svc.UpdateTask(context.Background(), uuid.New(), task); err != nil {
 		t.Fatalf("Member UpdateTask: %v", err)
 	}
