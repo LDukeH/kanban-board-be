@@ -12,6 +12,15 @@ import (
 	"github.com/google/uuid"
 )
 
+// validateVersion rejects a missing or non-positive version with ErrValidation,
+// which the handler maps to 400.
+func validateVersion(version int) error {
+	if version < 1 {
+		return fmt.Errorf("%w: version must be a positive integer", apperrors.ErrValidation)
+	}
+	return nil
+}
+
 type columnRepository interface {
 	Create(ctx context.Context, column *Column) error
 	GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error)
@@ -80,6 +89,10 @@ func (s *Service) UpdateColumnName(ctx context.Context, userID uuid.UUID, column
 		return apperrors.ErrForbidden
 	}
 
+	if err := validateVersion(column.Version); err != nil {
+		return err
+	}
+
 	return s.columnRepo.UpdateColumnName(ctx, column)
 }
 
@@ -93,6 +106,10 @@ func (s *Service) UpdateColumnPosition(ctx context.Context, userID uuid.UUID, co
 		return apperrors.ErrForbidden
 	}
 
+	if err := validateVersion(column.Version); err != nil {
+		return err
+	}
+
 	return s.columnRepo.UpdateColumnPosition(ctx, column.ID, column.Position, column.Version)
 }
 
@@ -104,6 +121,10 @@ func (s *Service) DeleteColumn(ctx context.Context, userID uuid.UUID, columnID u
 
 	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
+	}
+
+	if err := validateVersion(version); err != nil {
+		return err
 	}
 
 	return s.columnRepo.DeleteColumn(ctx, columnID, version)

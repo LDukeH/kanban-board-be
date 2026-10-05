@@ -117,9 +117,15 @@ func (h *Handler) UpdateColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Version == nil {
+		http.Error(w, "Column version is required", http.StatusBadRequest)
+		return
+	}
+
 	column := Column{
-		ID:   columnID,
-		Name: req.Name,
+		ID:      columnID,
+		Name:    req.Name,
+		Version: *req.Version,
 	}
 
 	if err := h.service.UpdateColumnName(r.Context(), userID, &column); err != nil {
@@ -162,9 +168,15 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Version == nil {
+		http.Error(w, "Column version is required", http.StatusBadRequest)
+		return
+	}
+
 	column := Column{
 		ID:       columnID,
 		Position: req.Position,
+		Version:  *req.Version,
 	}
 
 	if err := h.service.UpdateColumnPosition(r.Context(), userID, &column); err != nil {
@@ -186,13 +198,14 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updated)
 }
 
-// columnVersionFromQuery reads ?version=, 0 when absent or invalid.
-func columnVersionFromQuery(r *http.Request) int {
-	v, err := strconv.Atoi(r.URL.Query().Get("version"))
-	if err != nil {
-		return 0
+// columnVersionFromQuery parses ?version=, reporting whether it is valid.
+func columnVersionFromQuery(r *http.Request) (int, bool) {
+	raw := r.URL.Query().Get("version")
+	v, err := strconv.Atoi(raw)
+	if raw == "" || err != nil || v < 1 {
+		return 0, false
 	}
-	return v
+	return v, true
 }
 
 func (h *Handler) DeleteColumn(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +222,13 @@ func (h *Handler) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.DeleteColumn(r.Context(), userID, columnID, columnVersionFromQuery(r)); err != nil {
+	version, ok := columnVersionFromQuery(r)
+	if !ok {
+		http.Error(w, "Column version is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.DeleteColumn(r.Context(), userID, columnID, version); err != nil {
 		log.Printf("ERROR: Failed to delete column: %v", err)
 		apperrors.WriteError(w, err)
 		return
