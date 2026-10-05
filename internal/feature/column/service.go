@@ -17,8 +17,8 @@ type columnRepository interface {
 	GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error)
 	GetByID(ctx context.Context, columnID uuid.UUID) (*Column, error)
 	UpdateColumnName(ctx context.Context, column *Column) error
-	UpdateColumnPosition(ctx context.Context, columnID uuid.UUID, newPosition int) error
-	DeleteColumn(ctx context.Context, columnID uuid.UUID) error
+	UpdateColumnPosition(ctx context.Context, columnID uuid.UUID, newPosition int, version int) error
+	DeleteColumn(ctx context.Context, columnID uuid.UUID, version int) error
 }
 
 type boardRepository interface {
@@ -93,10 +93,10 @@ func (s *Service) UpdateColumnPosition(ctx context.Context, userID uuid.UUID, co
 		return apperrors.ErrForbidden
 	}
 
-	return s.columnRepo.UpdateColumnPosition(ctx, column.ID, column.Position)
+	return s.columnRepo.UpdateColumnPosition(ctx, column.ID, column.Position, column.Version)
 }
 
-func (s *Service) DeleteColumn(ctx context.Context, userID uuid.UUID, columnID uuid.UUID) error {
+func (s *Service) DeleteColumn(ctx context.Context, userID uuid.UUID, columnID uuid.UUID, version int) error {
 	role, err := s.authz.GetColumnRole(ctx, userID, columnID)
 	if err != nil {
 		return err
@@ -106,5 +106,5 @@ func (s *Service) DeleteColumn(ctx context.Context, userID uuid.UUID, columnID u
 		return apperrors.ErrForbidden
 	}
 
-	return s.columnRepo.DeleteColumn(ctx, columnID)
+	return s.columnRepo.DeleteColumn(ctx, columnID, version)
 }

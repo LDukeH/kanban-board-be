@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"kanban-board-be/internal/apperrors"
 	"kanban-board-be/internal/feature/auth"
@@ -185,6 +186,15 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updated)
 }
 
+// columnVersionFromQuery reads ?version=, 0 when absent or invalid.
+func columnVersionFromQuery(r *http.Request) int {
+	v, err := strconv.Atoi(r.URL.Query().Get("version"))
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
 func (h *Handler) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 	userID, err := auth.GetUserID(r)
 	if err != nil {
@@ -199,7 +209,7 @@ func (h *Handler) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.DeleteColumn(r.Context(), userID, columnID); err != nil {
+	if err := h.service.DeleteColumn(r.Context(), userID, columnID, columnVersionFromQuery(r)); err != nil {
 		log.Printf("ERROR: Failed to delete column: %v", err)
 		apperrors.WriteError(w, err)
 		return
