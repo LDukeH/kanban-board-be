@@ -12,8 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// validateVersion rejects a missing or non-positive version with ErrValidation,
-// which the handler maps to 400.
 func validateVersion(version int) error {
 	if version < 1 {
 		return fmt.Errorf("%w: version must be a positive integer", apperrors.ErrValidation)
@@ -56,8 +54,7 @@ func (s *Service) CreateColumn(ctx context.Context, userID uuid.UUID, column *Co
 	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
-	// position will be handled in repository layer, so we don't need to set it here
-
+	
 	return s.columnRepo.Create(ctx, column)
 }
 

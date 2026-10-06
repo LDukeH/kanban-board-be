@@ -20,8 +20,6 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-// ListByTaskID returns all comments for a task, oldest first, together with
-// the author email joined from users.
 func (r *Repository) ListByTaskID(ctx context.Context, taskID uuid.UUID) ([]*CommentResponse, error) {
 	query := `
 SELECT
@@ -68,9 +66,6 @@ ORDER BY c.created_at ASC, c.id ASC
 	return comments, nil
 }
 
-// Create inserts a comment and returns the created comment enriched with the
-// author email. The INSERT and the users join run in a single round trip so
-// the caller receives the full API response without a follow-up lookup.
 func (r *Repository) Create(ctx context.Context, comment *Comment) (*CommentResponse, error) {
 	query := `
 WITH inserted AS (
@@ -108,7 +103,6 @@ ON u.id = i.author_id
 	return response, nil
 }
 
-// GetByID returns the database row for a single comment.
 func (r *Repository) GetByID(ctx context.Context, commentID uuid.UUID) (*Comment, error) {
 	query := `
 SELECT
@@ -141,9 +135,6 @@ WHERE id = $1
 	return comment, nil
 }
 
-// Delete removes a comment. It returns pgx.ErrNoRows when the comment does
-// not exist (or was already deleted) so the caller can report 404 instead of
-// a misleading 204.
 func (r *Repository) Delete(ctx context.Context, commentID uuid.UUID) error {
 	commandTag, err := r.pool.Exec(ctx, `DELETE FROM comments WHERE id = $1`, commentID)
 	if err != nil {

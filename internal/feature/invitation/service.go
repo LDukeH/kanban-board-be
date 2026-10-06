@@ -24,15 +24,11 @@ type invitationRepository interface {
 	ListByWorkspaceID(ctx context.Context, workspaceID uuid.UUID) ([]*InvitationResponse, error)
 }
 
-// membershipRepository is the subset of the membership repository the
-// invitation service needs. Memberships are only created through invitation
-// acceptance, in the same transaction.
 type membershipRepository interface {
 	CreateTx(ctx context.Context, tx pgx.Tx, membership *membership.WorkspaceMembership) error
 	GetByUserAndWorkspaceID(ctx context.Context, userID, workspaceID uuid.UUID) (*membership.WorkspaceMembership, error)
 }
 
-// workspaceNameProvider loads a workspace's name. It is satisfied by the workspace repository.
 type workspaceNameProvider interface {
 	GetWorkspaceName(ctx context.Context, workspaceID uuid.UUID) (string, error)
 }
@@ -61,10 +57,6 @@ func NewService(
 	}
 }
 
-// Create invites a registered user to a workspace. Only owners and admins can
-// invite; existing members and users with a pending invitation are rejected.
-// The invitation and its workspace_invited notification are created in one
-// transaction, so a failure never leaves a phantom invitation or notification.
 func (s *Service) Create(ctx context.Context, workspaceID, inviteeUserID, actorID uuid.UUID) (*WorkspaceInvitation, error) {
 	// Only owners and admins may invite.
 	actorRole, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, actorID, workspaceID)
@@ -110,8 +102,6 @@ func (s *Service) Create(ctx context.Context, workspaceID, inviteeUserID, actorI
 	defer tx.Rollback(ctx)
 
 	if err := s.invitationRepo.CreateTx(ctx, tx, invitation); err != nil {
-		// A second pending invitation violates the partial unique index on
-		// (workspace_id, invitee_user_id): report it as a conflict, not a 500.
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return nil, apperrors.ErrConflict
@@ -140,9 +130,6 @@ func (s *Service) Create(ctx context.Context, workspaceID, inviteeUserID, actorI
 	return invitation, nil
 }
 
-// List returns a workspace's invitations. Only workspace owners and admins
-// may view them; statuses are reported with lazily applied expiry, so a
-// pending invitation whose expiry has passed reads as expired.
 func (s *Service) List(ctx context.Context, workspaceID, userID uuid.UUID) ([]*InvitationResponse, error) {
 	// Only workspace owners and admins may view the invitation list.
 	mem, err := s.membershipRepo.GetByUserAndWorkspaceID(ctx, userID, workspaceID)
@@ -170,11 +157,6 @@ func (s *Service) List(ctx context.Context, workspaceID, userID uuid.UUID) ([]*I
 	return invitations, nil
 }
 
-// Accept transitions a pending invitation into accepted and creates the
-// invitee's membership in the same transaction. Concurrent attempts serialize
-// on the locked invitation row; the loser sees a non-pending invitation, and
-// the (user_id, workspace_id) unique constraint backstops duplicate
-// memberships.
 func (s *Service) Accept(ctx context.Context, invitationID, userID uuid.UUID) (*WorkspaceInvitation, error) {
 	tx, invitation, err := s.beginAndLock(ctx, invitationID)
 	if err != nil {
@@ -198,8 +180,6 @@ func (s *Service) Accept(ctx context.Context, invitationID, userID uuid.UUID) (*
 	invitation.Status = StatusAccepted
 	invitation.UpdatedAt = updatedAt
 
-	// The membership rides the acceptance transaction: either both the
-	// acceptance and the membership are stored, or neither is.
 	newMembership := &membership.WorkspaceMembership{
 		WorkspaceID: invitation.WorkspaceID,
 		UserID:      invitation.InviteeUserID,
@@ -222,8 +202,6 @@ func (s *Service) Accept(ctx context.Context, invitationID, userID uuid.UUID) (*
 	return invitation, nil
 }
 
-// Decline transitions a pending invitation into declined. Only the invited
-// user may decline.
 func (s *Service) Decline(ctx context.Context, invitationID, userID uuid.UUID) (*WorkspaceInvitation, error) {
 	tx, invitation, err := s.beginAndLock(ctx, invitationID)
 	if err != nil {
@@ -254,8 +232,6 @@ func (s *Service) Decline(ctx context.Context, invitationID, userID uuid.UUID) (
 	return invitation, nil
 }
 
-// Cancel transitions a pending invitation into cancelled. Only owners and
-// admins of the invitation's workspace may cancel.
 func (s *Service) Cancel(ctx context.Context, workspaceID, invitationID, userID uuid.UUID) (*WorkspaceInvitation, error) {
 	tx, invitation, err := s.beginAndLock(ctx, invitationID)
 	if err != nil {
@@ -298,9 +274,6 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, invitationID, userID 
 	return invitation, nil
 }
 
-// beginAndLock starts a transaction and loads the invitation row FOR UPDATE
-// so concurrent transitions serialize on it. On error the transaction is
-// already rolled back; otherwise the caller owns it.
 func (s *Service) beginAndLock(ctx context.Context, invitationID uuid.UUID) (pgx.Tx, *WorkspaceInvitation, error) {
 	tx, err := s.invitationRepo.BeginTx(ctx)
 	if err != nil {
@@ -319,9 +292,6 @@ func (s *Service) beginAndLock(ctx context.Context, invitationID uuid.UUID) (pgx
 	return tx, invitation, nil
 }
 
-// requirePending rejects invitations that are no longer pending. A pending
-// row whose expiry has passed is converged to expired (committed) so storage
-// matches the domain state; callers receive a conflict either way.
 func (s *Service) requirePending(ctx context.Context, tx pgx.Tx, invitation *WorkspaceInvitation) error {
 	if invitation.EffectiveStatus(time.Now()) == StatusPending {
 		return nil

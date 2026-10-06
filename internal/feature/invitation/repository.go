@@ -56,9 +56,6 @@ RETURNING id, created_at, updated_at
 	)
 }
 
-// GetByIDForUpdate locks the invitation row (SELECT ... FOR UPDATE) inside
-// the caller's transaction so concurrent accept/decline/cancel attempts
-// serialize on it.
 func (r *Repository) GetByIDForUpdate(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -103,9 +100,6 @@ FOR UPDATE
 	return invitation, nil
 }
 
-// UpdateStatusTx moves a pending invitation into the given terminal state and
-// returns the new updated_at. The SQL guard re-checks the pending state so a
-// concurrent transition cannot slip through.
 func (r *Repository) UpdateStatusTx(
 	ctx context.Context,
 	tx pgx.Tx,

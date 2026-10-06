@@ -312,7 +312,6 @@ func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 	return nil
 }
 
-// guardVersion checks the version without writing, for a patch with no fields.
 func (r *Repository) guardVersion(ctx context.Context, task *Task) error {
 	var current int
 	err := r.pool.QueryRow(ctx, `SELECT version FROM tasks WHERE id = $1`, task.ID).Scan(&current)
@@ -367,7 +366,6 @@ func buildTaskUpdateSet(task *Task) ([]string, []any) {
 	return setClauses, args
 }
 
-// UpdateTaskPosition moves a task, checking only the moved task's version.
 func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 	tx, err := r.pool.Begin(ctx)
 
@@ -381,15 +379,17 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 	err = tx.QueryRow(
 		ctx,
 		`
-		SELECT id, column_id, position
+		SELECT id, column_id, position, version
 		FROM tasks
 		WHERE id = $1
+		FOR UPDATE
 		`,
 		task.ID,
 	).Scan(
 		&currentTask.ID,
 		&currentTask.ColumnID,
 		&currentTask.Position,
+		&currentTask.Version,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -406,6 +406,7 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 
 	// No change in position or column
 	if newPosition == oldPosition && targetColumnID == sourceColumnID {
+		task.Version = currentTask.Version
 		return nil
 	}
 
@@ -485,7 +486,6 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 		}
 	}
 
-	// Move the target task, the one row whose version the client asserted on.
 	result, err := tx.Exec(
 		ctx,
 		`
@@ -495,27 +495,24 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 				version = version + 1,
 				updated_at = NOW()
 			WHERE id = $3
-			  AND version = $4
 		`,
 		newPosition,
 		targetColumnID,
 		task.ID,
-		task.Version,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update task position: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		// Returning here rolls the shifts above back.
-		return resolveVersionMismatch(ctx, tx, task.ID)
+		return apperrors.ErrNotFound
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit task move: %w", err)
 	}
 
-	task.Version++
+	task.Version = currentTask.Version + 1
 	return nil
 }
 
@@ -652,8 +649,6 @@ func (r *Repository) GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]
 	}
 	defer rows.Close()
 
-	// Initialize as an empty slice so an empty assignment list is encoded as
-	// `[]` instead of `null`.
 	users := []*UsersTaskResponse{}
 	for rows.Next() {
 		user := &UsersTaskResponse{}

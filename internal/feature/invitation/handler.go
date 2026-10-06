@@ -25,8 +25,6 @@ func NewHandler(invitationService *Service, userService *user.Service) *Handler 
 	}
 }
 
-// workspaceInvitationResponse builds the API response for an invitation and
-// resolves the invitee's email for display.
 func (h *Handler) workspaceInvitationResponse(r *http.Request, invitation *WorkspaceInvitation) *InvitationResponse {
 	response := &InvitationResponse{
 		ID:              invitation.ID,

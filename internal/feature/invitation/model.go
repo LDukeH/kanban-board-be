@@ -17,7 +17,6 @@ const (
 	StatusExpired   Status = "expired"
 )
 
-// DefaultExpiry is how long a pending invitation stays acceptable.
 const DefaultExpiry = 7 * 24 * time.Hour
 
 type WorkspaceInvitation struct {
@@ -31,8 +30,6 @@ type WorkspaceInvitation struct {
 	ExpiresAt       time.Time `json:"expires_at"`
 }
 
-// EffectiveStatus reports the invitation's current status, treating a pending
-// invitation whose expiry has passed as expired.
 func (i *WorkspaceInvitation) EffectiveStatus(now time.Time) Status {
 	return effectiveStatus(i.Status, i.ExpiresAt, now)
 }
@@ -45,7 +42,6 @@ func effectiveStatus(status Status, expiresAt, now time.Time) Status {
 }
 
 type InvitationCreateRequest struct {
-	// UserID identifies the registered user to invite.
 	UserID uuid.UUID `json:"user_id"`
 }
 

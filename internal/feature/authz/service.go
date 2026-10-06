@@ -12,19 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Resolver resolves a user's access to a workspace-scoped resource.
-//
-// Each method answers "which workspace owns this resource, and what is the
-// user's role in it?" with one SQL statement that joins the resource up to
-// workspace_memberships. The previous implementation walked the ownership
-// chain one hop per query (task -> column -> board -> workspace -> membership),
-// costing up to four database round trips per authorized request; on a
-// serverless deployment talking to a remote database those round trips, not
-// the query plans, dominate response time.
-//
-// A missing resource and a resource the user cannot see are reported the same
-// way (pgx.ErrNoRows) because the two are indistinguishable through this
-// interface; the caller maps both to apperrors.ErrForbidden.
 type Resolver interface {
 	// GetWorkspaceRole returns the user's role in the workspace.
 	GetWorkspaceRole(ctx context.Context, userID, workspaceID uuid.UUID) (membership.WorkspaceRole, error)
@@ -42,19 +29,14 @@ type Resolver interface {
 	GetLabelRole(ctx context.Context, userID, labelID uuid.UUID) (uuid.UUID, membership.WorkspaceRole, error)
 }
 
-// Service provides authorization checks for workspace-scoped resources.
 type Service struct {
 	resolver Resolver
 }
 
-// NewService creates a new authorization service.
 func NewService(resolver Resolver) *Service {
 	return &Service{resolver: resolver}
 }
 
-// mapAccessError keeps "not a member" and "does not exist" as 403 Forbidden
-// (the workspace is the authorization boundary, so a caller never learns which
-// of the two happened) while any other failure stays a 500.
 func mapAccessError(err error, operation string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperrors.ErrForbidden
@@ -62,8 +44,6 @@ func mapAccessError(err error, operation string) error {
 	return fmt.Errorf("%s: %w", operation, err)
 }
 
-// GetWorkspaceRole returns the user's role in the workspace, or ErrForbidden
-// when the user is not a member of it.
 func (s *Service) GetWorkspaceRole(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -76,7 +56,6 @@ func (s *Service) GetWorkspaceRole(
 	return role, nil
 }
 
-// GetBoardRole returns the user's role in the workspace that owns the board.
 func (s *Service) GetBoardRole(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -89,7 +68,6 @@ func (s *Service) GetBoardRole(
 	return role, nil
 }
 
-// GetColumnRole returns the user's role in the workspace that owns the column.
 func (s *Service) GetColumnRole(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -102,7 +80,6 @@ func (s *Service) GetColumnRole(
 	return role, nil
 }
 
-// GetTaskRole returns the user's role in the workspace that owns the task.
 func (s *Service) GetTaskRole(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -115,7 +92,6 @@ func (s *Service) GetTaskRole(
 	return role, nil
 }
 
-// GetLabelRole returns the user's role in the workspace that owns the label.
 func (s *Service) GetLabelRole(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -128,8 +104,6 @@ func (s *Service) GetLabelRole(
 	return role, nil
 }
 
-// GetColumnBoardID returns the board that owns the column after verifying the
-// user can access it, so a caller cannot use it to probe another workspace.
 func (s *Service) GetColumnBoardID(ctx context.Context, userID uuid.UUID, columnID uuid.UUID) (uuid.UUID, error) {
 	boardID, _, err := s.resolver.GetColumnRole(ctx, userID, columnID)
 	if err != nil {

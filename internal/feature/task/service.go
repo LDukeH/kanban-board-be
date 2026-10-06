@@ -28,8 +28,6 @@ type TaskRepository interface {
 	GetUsersByTaskID(ctx context.Context, taskID uuid.UUID) ([]*UsersTaskResponse, error)
 }
 
-// validateVersion rejects a missing or non-positive version with ErrValidation,
-// which the handler maps to 400.
 func validateVersion(version int) error {
 	if version < 1 {
 		return fmt.Errorf("%w: version must be a positive integer", apperrors.ErrValidation)

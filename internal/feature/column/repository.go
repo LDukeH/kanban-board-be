@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// db is the slice of *pgxpool.Pool this repository uses, so tests can inject a mock.
 type db interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
@@ -31,12 +30,10 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-// NewRepositoryWithDB builds a repository over any db implementation, for tests.
 func NewRepositoryWithDB(pool db) *Repository {
 	return &Repository{pool: pool}
 }
 
-// classifyVersionMismatch splits "matched no rows" into conflict or not found.
 func classifyVersionMismatch(exists bool) error {
 	if exists {
 		return apperrors.ErrConflict
@@ -44,7 +41,6 @@ func classifyVersionMismatch(exists bool) error {
 	return apperrors.ErrNotFound
 }
 
-// resolveVersionMismatch returns the error to propagate, so the caller rolls back.
 func resolveVersionMismatch(ctx context.Context, q db, columnID uuid.UUID) error {
 	var exists bool
 	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM columns WHERE id = $1)`, columnID).Scan(&exists)
@@ -143,7 +139,6 @@ func (r *Repository) GetByID(ctx context.Context, columnID uuid.UUID) (*Column, 
 	return column, nil
 }
 
-// UpdateColumnName renames a column, guarded by the client's version.
 func (r *Repository) UpdateColumnName(ctx context.Context, column *Column) error {
 	query := `
 		UPDATE columns
@@ -166,7 +161,6 @@ func (r *Repository) UpdateColumnName(ctx context.Context, column *Column) error
 	return nil
 }
 
-// UpdateColumnPosition reorders a column, checking only the moved column's version.
 func (r *Repository) UpdateColumnPosition(ctx context.Context, columnID uuid.UUID, newPosition int, version int) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -243,7 +237,6 @@ func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID, versi
 	}
 	defer tx.Rollback(ctx)
 
-	// Get the position and board id
 	var boardID uuid.UUID
 	var position int
 
@@ -264,7 +257,6 @@ func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID, versi
 		return fmt.Errorf("failed to get column before deletion: %w", err)
 	}
 
-	// Delete the column. Its tasks cascade through fk_tasks_column.
 	result, err := tx.Exec(
 		ctx,
 		`
@@ -284,7 +276,6 @@ func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID, versi
 		return resolveVersionMismatch(ctx, tx, columnID)
 	}
 
-	// Shift other columns' positions
 	_, err = tx.Exec(
 		ctx,
 		`

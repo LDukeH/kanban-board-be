@@ -253,9 +253,6 @@ func (r *Repository) RemoveMember(
 	return nil
 }
 
-// TransferOwnership demotes the current owner to a member and promotes the
-// successor. Both updates run in a single transaction so a failure leaves the
-// workspace's ownership unchanged.
 func (r *Repository) TransferOwnership(
 	ctx context.Context,
 	oldOwnerID, newOwnerID, workspaceID uuid.UUID,
@@ -264,8 +261,6 @@ func (r *Repository) TransferOwnership(
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	// If we return early without committing, the transaction is rolled back.
-	// After a successful Commit this is a harmless no-op.
 	defer tx.Rollback(ctx)
 
 	query := `
@@ -273,9 +268,6 @@ func (r *Repository) TransferOwnership(
 		SET role = $1, updated_at = NOW()
 		WHERE user_id = $2 AND workspace_id = $3
 	`
-
-	// Demote the old owner first so the partial unique index on
-	// one owner per workspace is free for the new owner.
 	_, err = tx.Exec(ctx, query, "member", oldOwnerID, workspaceID)
 	if err != nil {
 		return fmt.Errorf("failed to demote old owner: %w", err)

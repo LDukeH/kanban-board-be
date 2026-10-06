@@ -36,7 +36,6 @@ func secureCookie() bool {
 	return sameSiteMode() == http.SameSiteNoneMode
 }
 
-// newAccessTokenCookie builds the session cookie. A negative maxAge clears it.
 func newAccessTokenCookie(token string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     "access_token",

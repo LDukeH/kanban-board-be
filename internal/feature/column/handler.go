@@ -134,7 +134,6 @@ func (h *Handler) UpdateColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the updated column so clients can read the new name/timestamps.
 	updated, err := h.service.GetColumnByID(r.Context(), columnID)
 	if err != nil {
 		log.Printf("ERROR: Failed to read updated column: %v", err)
@@ -185,7 +184,6 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the updated column so clients can read the new position.
 	updated, err := h.service.GetColumnByID(r.Context(), columnID)
 	if err != nil {
 		log.Printf("ERROR: Failed to read updated column: %v", err)
@@ -198,7 +196,6 @@ func (h *Handler) UpdateColumnPosition(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updated)
 }
 
-// columnVersionFromQuery parses ?version=, reporting whether it is valid.
 func columnVersionFromQuery(r *http.Request) (int, bool) {
 	raw := r.URL.Query().Get("version")
 	v, err := strconv.Atoi(raw)

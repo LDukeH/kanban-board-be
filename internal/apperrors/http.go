@@ -5,7 +5,6 @@ import (
 	"net/http"
 )
 
-// WriteError maps domain errors to HTTP status codes and writes the response.
 func WriteError(w http.ResponseWriter, err error) {
 	var status int
 

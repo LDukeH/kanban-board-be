@@ -11,19 +11,12 @@ import (
 )
 
 const (
-	// connectTimeout bounds dialing the pooler. Without it a cold serverless
-	// instance can block on a TCP handshake until the platform kills it.
 	connectTimeout = 5 * time.Second
 
-	// Each serverless instance is short-lived and Supabase's pooler enforces a
-	// hard client limit, so keep the per-instance footprint deliberately small.
 	maxConns = 2
 	minConns = 0
 )
 
-// NewPostgresPool parses DATABASE_URL into a bounded pgx pool with explicit
-// timeouts so a slow or unreachable database surfaces as a request error
-// instead of a hung (or platform-killed) function invocation.
 func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -48,7 +41,6 @@ func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
 
-	// Ping with a deadline so the handshake cannot exceed connectTimeout. A
 	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 

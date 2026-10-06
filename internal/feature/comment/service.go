@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// maxCommentLength is the maximum comment content length enforced after trimming.
 const maxCommentLength = 5000
 
 type commentRepository interface {
@@ -35,8 +34,6 @@ func NewService(commentRepo commentRepository, authz *authz.Service) *Service {
 	}
 }
 
-// ListByTaskID returns the task's comments oldest to newest for any workspace
-// member (owner, admin, member).
 func (s *Service) ListByTaskID(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) ([]*CommentResponse, error) {
 	role, err := s.authz.GetTaskRole(ctx, userID, taskID)
 	if err != nil {
@@ -50,8 +47,6 @@ func (s *Service) ListByTaskID(ctx context.Context, taskID uuid.UUID, userID uui
 	return s.commentRepo.ListByTaskID(ctx, taskID)
 }
 
-// CreateComment creates a comment on a task. The author is always the
-// authenticated user; the client can never supply the author.
 func (s *Service) CreateComment(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, content string) (*CommentResponse, error) {
 	content = strings.TrimSpace(content)
 	if len(content) < 1 {
@@ -80,9 +75,6 @@ func (s *Service) CreateComment(ctx context.Context, taskID uuid.UUID, userID uu
 	return s.commentRepo.Create(ctx, comment)
 }
 
-// DeleteComment deletes a comment. The author can always delete their own
-// comment; owner/admin can delete any comment in the workspace; everyone else
-// is forbidden.
 func (s *Service) DeleteComment(ctx context.Context, userID uuid.UUID, commentID uuid.UUID) error {
 	comment, err := s.commentRepo.GetByID(ctx, commentID)
 	if err != nil {
@@ -106,7 +98,6 @@ func (s *Service) DeleteComment(ctx context.Context, userID uuid.UUID, commentID
 	err = s.commentRepo.Delete(ctx, commentID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Deleted between the lookup and the delete (race) — treat as not found.
 			return apperrors.ErrNotFound
 		}
 		return err

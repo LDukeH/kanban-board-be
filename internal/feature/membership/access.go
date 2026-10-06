@@ -7,21 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// This file implements authz.Resolver.
-//
-// Each method answers "which workspace owns this resource, and what is the
-// user's role in it?" with a single statement, joining the resource up to
-// workspace_memberships. That replaces the previous hop-by-hop walk
-// (task -> column -> board -> workspace -> membership) which needed up to four
-// round trips per authorized request.
-//
-// None of these methods decide policy: they only report the role. Role checks
-// stay in the service layer.
-//
-// A resource that does not exist and a resource outside the user's workspaces
-// both yield pgx.ErrNoRows; the authz service maps that to ErrForbidden.
-
-// GetWorkspaceRole returns the user's role in the workspace.
 func (r *Repository) GetWorkspaceRole(ctx context.Context, userID, workspaceID uuid.UUID) (WorkspaceRole, error) {
 	query := `
 		SELECT role
@@ -37,8 +22,6 @@ func (r *Repository) GetWorkspaceRole(ctx context.Context, userID, workspaceID u
 	return role, nil
 }
 
-// GetBoardRole returns the workspace that owns the board and the user's role
-// in that workspace.
 func (r *Repository) GetBoardRole(ctx context.Context, userID, boardID uuid.UUID) (uuid.UUID, WorkspaceRole, error) {
 	query := `
 		SELECT b.workspace_id, wm.role
@@ -56,8 +39,6 @@ func (r *Repository) GetBoardRole(ctx context.Context, userID, boardID uuid.UUID
 	return workspaceID, role, nil
 }
 
-// GetColumnRole returns the board that owns the column and the user's role in
-// the column's workspace.
 func (r *Repository) GetColumnRole(ctx context.Context, userID, columnID uuid.UUID) (uuid.UUID, WorkspaceRole, error) {
 	query := `
 		SELECT c.board_id, wm.role
@@ -76,8 +57,6 @@ func (r *Repository) GetColumnRole(ctx context.Context, userID, columnID uuid.UU
 	return boardID, role, nil
 }
 
-// GetTaskRole returns the task's column, that column's board, and the user's
-// role in the task's workspace.
 func (r *Repository) GetTaskRole(ctx context.Context, userID, taskID uuid.UUID) (uuid.UUID, uuid.UUID, WorkspaceRole, error) {
 	query := `
 		SELECT t.column_id, c.board_id, wm.role
@@ -98,8 +77,6 @@ func (r *Repository) GetTaskRole(ctx context.Context, userID, taskID uuid.UUID) 
 	return columnID, boardID, role, nil
 }
 
-// GetLabelRole returns the board that owns the label and the user's role in
-// the label's workspace.
 func (r *Repository) GetLabelRole(ctx context.Context, userID, labelID uuid.UUID) (uuid.UUID, WorkspaceRole, error) {
 	query := `
 		SELECT l.board_id, wm.role

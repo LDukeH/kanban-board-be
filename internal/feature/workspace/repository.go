@@ -65,12 +65,6 @@ func (r *Repository) CreateTx(
 	)
 }
 
-// Member workspaces with the caller's role and counts.
-//
-// The counts are computed by two grouped scans restricted to the caller's
-// workspaces, instead of a COUNT subquery per returned row: the previous shape
-// planned 2N correlated subqueries, so a user in ten workspaces paid twenty
-// extra subplans for the same numbers.
 func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*WorkspaceSummary, error) {
 	query := `
 		WITH user_workspaces AS (
@@ -264,7 +258,6 @@ func (r *Repository) GetMembership(
 	return membership, nil
 }
 
-// Partial update: only fields present in the request are written.
 func (r *Repository) UpdateWorkspace(ctx context.Context, update *WorkspaceUpdate) error {
 	var setClauses []string
 	var args []interface{}

@@ -50,9 +50,6 @@ func validateWorkspaceDescription(description string) error {
 	return nil
 }
 
-// A name made only of whitespace is not a name, so it is rejected here rather
-// than stored. Callers get the trimmed value back so a padded name never
-// round-trips with its padding.
 func normalizeWorkspaceName(name string) (string, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
