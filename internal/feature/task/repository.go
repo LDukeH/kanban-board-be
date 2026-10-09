@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/dbtx"
+	"kanban-board-be/internal/feature/auth"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -67,6 +69,20 @@ func resolveVersionMismatch(ctx context.Context, q db, taskID uuid.UUID) error {
 }
 
 func (r *Repository) Create(ctx context.Context, task *Task) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return fmt.Errorf("failed to set actor: %w", err)
+	}
+
 	query :=
 		`INSERT INTO tasks (
 			column_id,
@@ -88,7 +104,7 @@ func (r *Repository) Create(ctx context.Context, task *Task) error {
 	var priority string
 	var completed bool
 	var dueDateSQL *time.Time
-	err := r.pool.QueryRow(ctx, query, task.ColumnID, task.Title, task.Description, task.Priority, dueDate, task.Completed).Scan(
+	err = tx.QueryRow(ctx, query, task.ColumnID, task.Title, task.Description, task.Priority, dueDate, task.Completed).Scan(
 		&task.ID,
 		&priority,
 		&dueDateSQL,
@@ -103,6 +119,10 @@ func (r *Repository) Create(ctx context.Context, task *Task) error {
 	task.Priority = &priority
 	task.Completed = &completed
 	task.DueDate = dateToOptional(dueDateSQL)
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit task creation: %w", err)
+	}
 	return nil
 }
 
@@ -279,8 +299,23 @@ func (r *Repository) GetByColumnID(ctx context.Context, columnID uuid.UUID) ([]*
 func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 	setClauses, args := buildTaskUpdateSet(task)
 	if len(setClauses) == 0 {
-		// An empty patch still has to honour the guard.
+		// An empty patch still has to honour the guard. It writes nothing, so
+		// no broadcast fires and there is no actor to set.
 		return r.guardVersion(ctx, task)
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return fmt.Errorf("failed to set actor: %w", err)
 	}
 
 	args = append(args, task.ID)      // The task ID
@@ -299,13 +334,17 @@ func (r *Repository) UpdateTask(ctx context.Context, task *Task) error {
 		len(args),   // The position of the version in the args slice
 	)
 
-	result, err := r.pool.Exec(ctx, query, args...)
+	result, err := tx.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return resolveVersionMismatch(ctx, r.pool, task.ID)
+		return resolveVersionMismatch(ctx, tx, task.ID)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit task update: %w", err)
 	}
 
 	task.Version++
@@ -373,6 +412,14 @@ func (r *Repository) UpdateTaskPosition(ctx context.Context, task *Task) error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return fmt.Errorf("failed to set actor: %w", err)
+	}
 
 	var currentTask Task
 
@@ -523,6 +570,14 @@ func (r *Repository) DeleteTask(ctx context.Context, taskID uuid.UUID, version i
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return fmt.Errorf("failed to set actor: %w", err)
+	}
 
 	// Get the position and column id of the task to be deleted
 	var columnID uuid.UUID

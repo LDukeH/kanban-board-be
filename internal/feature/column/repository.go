@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/dbtx"
+	"kanban-board-be/internal/feature/auth"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -60,7 +62,29 @@ func (r *Repository) Create(ctx context.Context, column *Column) error {
 	VALUES ($1, $2, COALESCE((SELECT MAX(position) + 1 FROM columns WHERE board_id = $1), 0))
 	RETURNING id, position, version, created_at, updated_at`
 
-	return r.pool.QueryRow(ctx, query, column.BoardID, column.Name).Scan(&column.ID, &column.Position, &column.Version, &column.CreatedAt, &column.UpdatedAt)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return err
+	}
+
+	if err := tx.QueryRow(ctx, query, column.BoardID, column.Name).Scan(&column.ID, &column.Position, &column.Version, &column.CreatedAt, &column.UpdatedAt); err != nil {
+		return fmt.Errorf("failed to create column: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit column creation: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Repository) GetByBoardID(ctx context.Context, boardID uuid.UUID) ([]*Column, error) {
@@ -140,6 +164,20 @@ func (r *Repository) GetByID(ctx context.Context, columnID uuid.UUID) (*Column, 
 }
 
 func (r *Repository) UpdateColumnName(ctx context.Context, column *Column) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return err
+	}
+
 	query := `
 		UPDATE columns
 		SET name = $1,
@@ -149,15 +187,18 @@ func (r *Repository) UpdateColumnName(ctx context.Context, column *Column) error
 		  AND version = $3
 	`
 
-	result, err := r.pool.Exec(ctx, query, column.Name, column.ID, column.Version)
+	result, err := tx.Exec(ctx, query, column.Name, column.ID, column.Version)
 	if err != nil {
 		return fmt.Errorf("failed to update column: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return resolveVersionMismatch(ctx, r.pool, column.ID)
+		return resolveVersionMismatch(ctx, tx, column.ID)
 	}
 
 	column.Version++
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit column update: %w", err)
+	}
 	return nil
 }
 
@@ -167,6 +208,14 @@ func (r *Repository) UpdateColumnPosition(ctx context.Context, columnID uuid.UUI
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return err
+	}
 
 	var boardID uuid.UUID
 	var oldPosition int
@@ -236,6 +285,14 @@ func (r *Repository) DeleteColumn(ctx context.Context, columnID uuid.UUID, versi
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	userID, err := auth.GetUserIDCtx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := dbtx.SetActor(ctx, tx, userID); err != nil {
+		return err
+	}
 
 	var boardID uuid.UUID
 	var position int

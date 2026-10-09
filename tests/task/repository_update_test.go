@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kanban-board-be/internal/apperrors"
+	"kanban-board-be/internal/feature/auth"
 	. "kanban-board-be/internal/feature/task"
 
 	"github.com/google/uuid"
@@ -21,6 +22,22 @@ func mockRepo(t *testing.T) (*Repository, pgxmock.PgxPoolIface) {
 		t.Fatalf("pgxmock.NewPool: %v", err)
 	}
 	return NewRepositoryWithDB(mock), mock
+}
+
+// actorCtx returns a context carrying the acting user's ID, the way the auth
+// middleware does for production requests.
+func actorCtx() (context.Context, uuid.UUID) {
+	userID := uuid.New()
+	ctx := context.WithValue(context.Background(), auth.UserIDKey, userID.String())
+	return ctx, userID
+}
+
+// expectActor queues the set_config call that stamps app.actor_id at the start
+// of every mutation transaction.
+func expectActor(mock pgxmock.PgxPoolIface, userID uuid.UUID) {
+	mock.ExpectExec(`set_config`).
+		WithArgs(userID.String()).
+		WillReturnResult(pgxmock.NewResult("SELECT", 1))
 }
 
 // The two halves of the guard: the row must still exist, and its version must
@@ -41,13 +58,17 @@ func TestRepositoryClassifyVersionMismatch(t *testing.T) {
 func TestRepositoryUpdateTaskSuccess(t *testing.T) {
 	repo, mock := mockRepo(t)
 	taskID := uuid.New()
+	ctx, userID := actorCtx()
 
+	mock.ExpectBegin()
+	expectActor(mock, userID)
 	mock.ExpectExec(`UPDATE tasks`).
 		WithArgs("renamed", taskID, 1).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectCommit()
 
 	task := &Task{ID: taskID, Title: strp("renamed"), Version: 1}
-	if err := repo.UpdateTask(context.Background(), task); err != nil {
+	if err := repo.UpdateTask(ctx, task); err != nil {
 		t.Fatalf("UpdateTask: %v", err)
 	}
 	if task.Version != 2 {
@@ -62,20 +83,27 @@ func TestRepositoryUpdateTaskSuccess(t *testing.T) {
 func TestRepositoryUpdateTaskTwoClientsSameVersion(t *testing.T) {
 	repo, mock := mockRepo(t)
 	taskID := uuid.New()
+	ctx, userID := actorCtx()
 
+	mock.ExpectBegin()
+	expectActor(mock, userID)
 	mock.ExpectExec(`UPDATE tasks`).
 		WithArgs("first", taskID, 1).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectCommit()
 
+	mock.ExpectBegin()
+	expectActor(mock, userID)
 	mock.ExpectExec(`UPDATE tasks`).
 		WithArgs("second", taskID, 1).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 	mock.ExpectQuery(guardExistence.String()).
 		WithArgs(taskID).
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectRollback()
 
 	first := &Task{ID: taskID, Title: strp("first"), Version: 1}
-	if err := repo.UpdateTask(context.Background(), first); err != nil {
+	if err := repo.UpdateTask(ctx, first); err != nil {
 		t.Fatalf("first UpdateTask: %v", err)
 	}
 	if first.Version != 2 {
@@ -83,7 +111,7 @@ func TestRepositoryUpdateTaskTwoClientsSameVersion(t *testing.T) {
 	}
 
 	second := &Task{ID: taskID, Title: strp("second"), Version: 1}
-	if err := repo.UpdateTask(context.Background(), second); !errors.Is(err, apperrors.ErrConflict) {
+	if err := repo.UpdateTask(ctx, second); !errors.Is(err, apperrors.ErrConflict) {
 		t.Fatalf("second UpdateTask = %v, want ErrConflict", err)
 	}
 	if second.Version != 1 {
@@ -97,7 +125,10 @@ func TestRepositoryUpdateTaskTwoClientsSameVersion(t *testing.T) {
 func TestRepositoryUpdateTaskMissingRowIsNotFound(t *testing.T) {
 	repo, mock := mockRepo(t)
 	taskID := uuid.New()
+	ctx, userID := actorCtx()
 
+	mock.ExpectBegin()
+	expectActor(mock, userID)
 	mock.ExpectExec(`UPDATE tasks`).
 		WithArgs("t", taskID, 1).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
@@ -105,7 +136,7 @@ func TestRepositoryUpdateTaskMissingRowIsNotFound(t *testing.T) {
 		WithArgs(taskID).
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
 
-	err := repo.UpdateTask(context.Background(), &Task{ID: taskID, Title: strp("t"), Version: 1})
+	err := repo.UpdateTask(ctx, &Task{ID: taskID, Title: strp("t"), Version: 1})
 	if !errors.Is(err, apperrors.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
