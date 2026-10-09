@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"kanban-board-be/internal/db"
@@ -22,6 +23,7 @@ import (
 	"kanban-board-be/internal/feature/workspace"
 	"kanban-board-be/internal/server"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/joho/godotenv"
 )
 
@@ -43,9 +45,17 @@ func main() {
 
 	// Auth injection
 
+	supabaseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("SUPABASE_URL")), "/")
+	if supabaseURL == "" {
+		log.Fatal("SUPABASE_URL is not set")
+	}
+	jwks, err := keyfunc.NewDefault([]string{supabaseURL + "/auth/v1/.well-known/jwks.json"})
+	if err != nil {
+		log.Fatalf("Failed to initialize Supabase JWT verifier: %v", err)
+	}
 	authConfig := auth.Config{
-		SecretKey:  os.Getenv("JWT_SECRET"),
-		Expiration: 24 * time.Hour,
+		JWKSURL: supabaseURL + "/auth/v1/.well-known/jwks.json",
+		Issuer:  supabaseURL + "/auth/v1",
 	}
 
 	// Repo
@@ -59,7 +69,7 @@ func main() {
 	commentRepo := comment.NewRepository(pool)
 	// Authorization injection
 	authzService := authz.NewService(membershipRepo)
-	authService := auth.NewService(userService, authConfig)
+	authService := auth.NewService(userService, authConfig, jwks)
 	authHandler := auth.NewHandler(authService)
 
 	// Notification

@@ -16,6 +16,7 @@ type userRepository interface {
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	SearchByEmail(ctx context.Context, email string) ([]*UserResponse, error)
 	DeleteByID(ctx context.Context, id uuid.UUID) error
+	SyncExternal(ctx context.Context, id uuid.UUID, email string) error
 }
 
 type Service struct {
@@ -30,6 +31,10 @@ func NewService(repo userRepository) *Service {
 
 func (s *Service) CreateUser(ctx context.Context, user *User) error {
 	return s.repo.Create(ctx, user)
+}
+
+func (s *Service) SyncExternalUser(ctx context.Context, id uuid.UUID, email string) error {
+	return s.repo.SyncExternal(ctx, id, email)
 }
 
 func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {

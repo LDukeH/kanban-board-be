@@ -54,7 +54,7 @@ func (s *Service) CreateColumn(ctx context.Context, userID uuid.UUID, column *Co
 	if role != membership.Owner && role != membership.Admin {
 		return apperrors.ErrForbidden
 	}
-	
+
 	return s.columnRepo.Create(ctx, column)
 }
 

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -30,6 +31,18 @@ func (r *Repository) Create(ctx context.Context, user *User) error {
 	return r.pool.QueryRow(ctx, query, user.Email, user.PasswordHash).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
+func (r *Repository) SyncExternal(ctx context.Context, id uuid.UUID, email string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO users (id, email, password_hash)
+		VALUES ($1, $2, NULL)
+		ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, updated_at = NOW()
+	`, id, email)
+	if err != nil {
+		return fmt.Errorf("failed to sync external user: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) GetByID(
 	ctx context.Context,
 	id uuid.UUID,
@@ -48,6 +61,7 @@ func (r *Repository) GetByID(
 
 	user := &User{}
 
+	var passwordHash sql.NullString
 	err := r.pool.QueryRow(
 		ctx,
 		query,
@@ -55,10 +69,11 @@ func (r *Repository) GetByID(
 	).Scan(
 		&user.ID,
 		&user.Email,
-		&user.PasswordHash,
+		&passwordHash,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
+	user.PasswordHash = passwordHash.String
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by ID: %w", err)
@@ -84,6 +99,7 @@ func (r *Repository) GetByEmail(
 
 	user := &User{}
 
+	var passwordHash sql.NullString
 	err := r.pool.QueryRow(
 		ctx,
 		query,
@@ -91,10 +107,11 @@ func (r *Repository) GetByEmail(
 	).Scan(
 		&user.ID,
 		&user.Email,
-		&user.PasswordHash,
+		&passwordHash,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
+	user.PasswordHash = passwordHash.String
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by email: %w", err)

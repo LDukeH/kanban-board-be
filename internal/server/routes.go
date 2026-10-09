@@ -26,15 +26,11 @@ func (s *Server) MountHandlers() {
 		MaxAge:           300,
 	}))
 
-	// Public routes
-	s.Router.Post("/auth/register", s.authHandler.RegisterHandler)
-	s.Router.Post("/auth/login", s.authHandler.LoginHandler)
-
 	// Protected auth routes
 	s.Router.Group(func(r chi.Router) {
 		r.Use(s.authService.AuthMiddleware)
 
-		r.Post("/auth/logout", s.authHandler.LogoutHandler)
+		r.Post("/auth/sync", s.authHandler.SyncUserHandler)
 		r.Get("/auth/me", s.authHandler.GetMeHandler)
 		r.Delete("/auth/me", s.authHandler.DeleteMyAccountHandler)
 	})

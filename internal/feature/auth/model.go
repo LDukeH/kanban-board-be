@@ -1,20 +1,8 @@
 package auth
 
-import "time"
-
 type Config struct {
-	SecretKey  string
-	Expiration time.Duration
-}
-
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	JWKSURL string
+	Issuer  string
 }
 
 type GetMeResponse struct {
@@ -27,3 +15,4 @@ type GetMeResponse struct {
 type contextKey string
 
 const UserIDKey contextKey = "user_id"
+const UserEmailKey contextKey = "user_email"

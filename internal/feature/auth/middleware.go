@@ -4,32 +4,21 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract the token from the cookie
-		cookie, err := r.Cookie("access_token")
-
-		if err != nil {
-			if err == http.ErrNoCookie {
-				http.Error(w, "Missing access token", http.StatusUnauthorized)
-			} else {
-				log.Printf("failed to read access token cookie: %v", err)
-				http.Error(w, "Invalid request", http.StatusBadRequest)
-			}
+		header := strings.TrimSpace(r.Header.Get("Authorization"))
+		scheme, tokenString, ok := strings.Cut(header, " ")
+		if !ok || !strings.EqualFold(scheme, "Bearer") || strings.TrimSpace(tokenString) == "" {
+			http.Error(w, "Missing bearer token", http.StatusUnauthorized)
 			return
 		}
 
-		if cookie == nil || cookie.Value == "" {
-			http.Error(w, "Missing access token", http.StatusUnauthorized)
-			return
-		}
-
-		tokenString := cookie.Value
-
-		// Validate through the service
-		userID, err := ValidateToken(tokenString, s.config.SecretKey)
+		userID, err := s.ValidateToken(strings.TrimSpace(tokenString))
 
 		if err != nil {
 			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
@@ -37,8 +26,21 @@ func (s *Service) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Attach the user ID to the request context, userIDKey is from model
+		token, err := jwt.Parse(strings.TrimSpace(tokenString), s.jwks.Keyfunc)
+		if err != nil {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), UserIDKey, userID)
+		if email, ok := claims["email"].(string); ok {
+			ctx = context.WithValue(ctx, UserEmailKey, email)
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
