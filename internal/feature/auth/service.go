@@ -33,6 +33,7 @@ func (s *Service) SyncUser(ctx context.Context, id uuid.UUID, email string) erro
 
 func (s *Service) LookupUser(ctx context.Context) (*user.User, error) {
 	userID, err := GetUserIDCtx(ctx)
+	log.Printf("USER ID",userID.String())
 	if err != nil {
 		return nil, err
 	}
