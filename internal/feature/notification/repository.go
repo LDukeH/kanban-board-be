@@ -72,6 +72,21 @@ created_at,
 updated_at
 FROM notifications
 WHERE user_id = $1
+  AND (
+    type <> 'workspace_invited'
+    OR EXISTS (
+      SELECT 1
+      FROM workspace_invitations AS i
+      WHERE i.id = CASE
+        WHEN payload->>'invitation_id' ~ '^[0-9a-fA-F-]{36}$'
+        THEN (payload->>'invitation_id')::uuid
+        ELSE NULL
+      END
+        AND i.invitee_user_id = $1
+        AND i.status = 'pending'
+        AND i.expires_at > NOW()
+    )
+  )
 `
 
 	args := []any{userID}
@@ -128,6 +143,21 @@ SELECT COUNT(*)
 FROM notifications
 WHERE user_id = $1
   AND read_at IS NULL
+  AND (
+    type <> 'workspace_invited'
+    OR EXISTS (
+      SELECT 1
+      FROM workspace_invitations AS i
+      WHERE i.id = CASE
+        WHEN payload->>'invitation_id' ~ '^[0-9a-fA-F-]{36}$'
+        THEN (payload->>'invitation_id')::uuid
+        ELSE NULL
+      END
+        AND i.invitee_user_id = $1
+        AND i.status = 'pending'
+        AND i.expires_at > NOW()
+    )
+  )
 `
 
 	var count int
