@@ -5,11 +5,10 @@ Go REST API for a workspace-based Kanban board. Workspaces own boards, boards ow
 [![Backend CI](https://github.com/LDukeH/kanban-board-be/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/LDukeH/kanban-board-be/actions/workflows/backend-ci.yml)
 
 - Go version: see `go.mod` (`go 1.27.1` at time of writing)
-- License: <!-- TODO: add a LICENSE file and name it here (e.g. MIT) -->
 
 ## Frontend
 
-Companion board UI: `<!-- TODO: FRONTEND_REPO_URL, e.g. https://github.com/LDukeH/kanban-board -->`.
+Companion board UI: `https://kanvas-board.vercel.app`.
 ## Features
 
 Verified against `internal/feature/*`, `internal/server/routes.go`, and `migrations/`.
@@ -223,8 +222,4 @@ Workflow `.github/workflows/backend-ci.yml` (push/PR to `main`): gofmt check, `g
 ## Roadmap / Not included
 
 Verified absent: viewer role (only owner/admin/member), activity log, rate limiting, caching/Redis, Docker/Compose, pagination on task/comment lists, comment editing, server-side task filters.
-
-## License
-
-<!-- TODO: add a LICENSE file (e.g. MIT) and replace this line. -->
 
