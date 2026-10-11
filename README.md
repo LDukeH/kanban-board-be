@@ -52,18 +52,6 @@ Verified against `internal/feature/*`, `internal/server/routes.go`, and `migrati
 | Scripts | PowerShell smoke + latency probes | `scripts/` |
 | Hot reload | Air | `.air.toml` |
 
-## Architecture
-
-Per feature: `handler` (HTTP/JSON) -> `service` (authz + validation + tx) -> `repository` (SQL) -> `model` (structs). Shared: `internal/apperrors`, `internal/feature/authz`, `internal/db`, `internal/dbtx`, `internal/server` (`routes.go` wiring).
-
-```mermaid
-flowchart LR
-  Client[Browser / Frontend SPA] -->|HTTPS + Bearer JWT| API[Go API on Vercel<br/>chi router]
-  API -->|verify JWT via JWKS| SupaAuth[Supabase Auth]
-  API -->|pgxpool SQL| PG[(PostgreSQL on Supabase)]
-  PG -->|trigger + realtime.send<br/>board:{id}| RT[Supabase Realtime Broadcast]
-  RT -->|private channel| Client
-```
 
 ## API overview
 
